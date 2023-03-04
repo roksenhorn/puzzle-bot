@@ -1,0 +1,1 @@
+# given a path to a solution and a photo, tells us where to move this piece to
