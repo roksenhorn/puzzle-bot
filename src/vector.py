@@ -271,8 +271,8 @@ class Vector(object):
 
         snakes = [s for s in snakes if util.distance(s[0], s[-1]) > 0.09 * self.dim]
 
-        for snake in snakes:
-            print("Snake: ", snake, "len: ", util.distance(snake[0], snake[-1]))
+        # for snake in snakes:
+        #     print("Snake: ", snake, "len: ", util.distance(snake[0], snake[-1]))
 
         claimed_snakes = []
 
@@ -324,7 +324,7 @@ class Vector(object):
 
                 # let's make sure we'd join these two snakes with the line that connects them
                 if snakes_close_enough and enough_flat_side and collinear:
-                    print("We've found a partner!", snake, other_snake)
+                    # print("We've found a partner!", snake, other_snake)
                     claimed_snakes.append(snake)
                     claimed_snakes.append(other_snake)
 
@@ -362,7 +362,7 @@ class Vector(object):
             dim = self.height + (self.width - self.height) * (1 + math.cos(2 * snake_angle)) / 2
 
             if snake_len > EDGE_WIDTH_MIN_RATIO * dim:
-                print("Snake:", snake, "len:", round(snake_len), "@ angle:", round(snake_angle * 180/math.pi), "new dim:", round(dim), self.width, self.height)
+                # print("Snake:", snake, "len:", round(snake_len), "@ angle:", round(snake_angle * 180/math.pi), "new dim:", round(dim), self.width, self.height)
                 new_side = sides.Side(piece_id=self.id, side_id=None, vertices=self._pull_vertices_between(snake[0], snake[-1], self.dense_vertices), piece_center=self.center, is_edge=True)
                 self.sides.append(new_side)
 
@@ -371,7 +371,7 @@ class Vector(object):
         self.sides = []
 
         # drop any sides that don't connect near the other sides
-        print("RESULT:")
+        # print("RESULT:")
         for i, s in enumerate(sorted_sides):
             k = (i - 1) % len(sorted_sides)
             j = (i + 1) % len(sorted_sides)
@@ -381,9 +381,9 @@ class Vector(object):
             if util.distance(prior_side.vertices[-1], s.vertices[0]) <= 10 \
                 or util.distance(next_side.vertices[0], s.vertices[-1]) <= 10:
                 self.sides.append(s)
-                print(" - ", s)
-            else:
-                print(f"dropping {s}")
+            #     print(" - ", s)
+            # else:
+            #     print(f"dropping {s}")
 
         # we need to find 4 sides
         if len(self.sides) != 4:
@@ -446,8 +446,8 @@ class Vector(object):
                     j = side_after.vertices.index(v)
                     side_after.vertices.pop(j)
 
-            print(f"Corner {corner} is at {side_after.p1} (index {corner_vi}), intersection is {intersection}")
-            print(f"\tClosest point to intersection is {self.all_vertices[closest_i]} (@ {closest_i}), distance is {closest_dist}")
+            # print(f"Corner {corner} is at {side_after.p1} (index {corner_vi}), intersection is {intersection}")
+            # print(f"\tClosest point to intersection is {self.all_vertices[closest_i]} (@ {closest_i}), distance is {closest_dist}")
             corner_vertex = self.all_vertices[closest_i]
             side_before.vertices.append(corner_vertex)
             side_after.vertices.insert(0, corner_vertex)
