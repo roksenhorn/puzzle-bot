@@ -34,6 +34,11 @@ class Orientation(object):
     ZERO_POINTS_DOWN = 2
     ZERO_POINTS_LEFT = 3
 
+# dimensions for the puzzle you're solving
+# ...I know...
+WIDTH = 10
+HEIGHT = 10
+
 
 class Board(object):
     @staticmethod
@@ -152,9 +157,6 @@ class Board(object):
         if x == self.width - 1:
             sides.append(RIGHT)
         return sides
-
-WIDTH = 10
-HEIGHT = 10
 
 
 def build(input_path, output_path):
