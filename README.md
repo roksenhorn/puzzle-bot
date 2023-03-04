@@ -24,11 +24,11 @@ The solution of a 100 piece puzzle, showing each piece's position and orientatio
    45^   61v   89^   91<   73<   90<   60^   74<   44^   35v
 ```
 
-ASCII art showing the solver comparing two sides (green and yellow) and their proximity (white=intersection):
-![ASCII side compare](sample/side_compare_ascii.png)
-
 Actual solved puzzle:
 ![Solved puzzle](sample/solution.jpeg)
+
+ASCII art showing the solver comparing two sides (green and yellow) and their proximity (white=intersection):
+![ASCII side compare](sample/side_compare_ascii.png)
 
 ## Overview
 
@@ -40,7 +40,7 @@ This solver is designed to run in two modes:
 ## Usage: Functional Solver
 
 1. Drop images into the `./0_input` directory, named starting from `1.jpeg`, onward. There is no significance to the ordering of the numbers.
-2. `python3 solve.py --path root/of/repo
+2. `python3 src/solve.py --path .`
 3. To skip processing steps, you can optionally provide the argument `--skip n` to start from step `n+1`
 4. To only process one piece, you can provide the argument `--only i`
 
@@ -55,7 +55,7 @@ This mode isn't implemented yet, actually.
 If you have a new photo of an existing piece and need to be able to identify it, you can use the following command:
 
 ```
-python3 find.py --photo-path path/to/new/photo.jpg --puzzle-dir .
+python3 src/find.py --photo-path path/to/new/photo.jpg --puzzle-dir .
 ```
 
 ## Limitations
@@ -73,4 +73,3 @@ python3 find.py --photo-path path/to/new/photo.jpg --puzzle-dir .
 - Identified piece needs to return orientation too
 - Specify a solution file for better debugging logs as it attempts to solve
 - requirements.txt
-
