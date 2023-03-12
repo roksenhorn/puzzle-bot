@@ -86,14 +86,8 @@ def grow(mosaic, new_path, photo_origin):
     print(f"Adding {new_path.split('/')[-1]} @ {photo_origin} ({w}x{h}) to mosaic...")
     minx, miny = None, None
     min_ssd = None
-    if '11' in new_path:
-        xrange = range(-30, 34)
-        yrange = range(-3, 4)
-    else:
-        xrange = range(-10, 11)
-        yrange = range(-10, 11)
-    for x in xrange:
-        for y in yrange:
+    for x in range(-5, 6):
+        for y in range(-5, 6):
             xx = x + (photo_origin[0] - mosaic.origin[0]) + mosaic.pixels_origin[0]
             yy = y + (photo_origin[1] - mosaic.origin[1]) + mosaic.pixels_origin[1]
             ssd, scaled = _ssd(mosaic, pixels, w, h, xx, yy)
@@ -133,9 +127,7 @@ def _ssd(mosaic, pixels, w, h, x, y):
     return ssd, ssd/count
 
 
-def build_from_directory(directory_path, position_data, start_index=1):
-    print(position_data)
-
+def build_from_directory(directory_path, position_data, start_index=1, output_path=None):
     pixels, w, h = segment.segment(filename=os.path.join(directory_path, f"{start_index}.jpg"), clean_and_crop=False)
     mosaic = Mosaic(pixels, w, h, origin=position_data[start_index])
 
@@ -147,7 +139,8 @@ def build_from_directory(directory_path, position_data, start_index=1):
         i += 1
 
     mosaic.print()
-    mosaic.save('mosaic.bmp')
+    if output_path:
+        mosaic.save(output_path)
 
 
 if __name__ == "__main__":
@@ -155,9 +148,10 @@ if __name__ == "__main__":
     parser.add_argument('--directory-path', required=True, help='Path to a directory full of overlapping images')
     parser.add_argument('--position-data-path', required=True, help='Path to a YAML file that contains the position each photo was taken at')
     parser.add_argument('--start-at-index', required=False, default=1, help='start processing from i.jpg')
+    parser.add_argument('--output-path', required=False, default=None, help='Where to save the mosaic BMP to')
     args = parser.parse_args()
 
     with open(args.position_data_path) as f:
         position_data = yaml.safe_load(f)
 
-    build_from_directory(args.directory_path, position_data, args.start_at_index)
+    build_from_directory(args.directory_path, position_data, args.start_at_index, args.output_path)
