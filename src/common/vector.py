@@ -27,21 +27,7 @@ class Vector(object):
     @staticmethod
     def from_file(filename, id) -> 'Vector':
         # Open image file
-        with Image.open(filename) as img:
-            # Get image data as a 2D array of pixels
-            width, height = img.size
-            pixels = list(img.getdata())
-
-        binary_pixels = []
-
-        # Convert pixels to 0 or 1
-        for i, pixel in enumerate(pixels):
-            x = i % width
-            y = i // width
-            if y >= len(binary_pixels):
-                binary_pixels.append([])
-            binary_pixels[y].append(1 if pixel > 0 else 0)
-
+        binary_pixels, width, height = util.load_binary_image(filename)
         v = Vector(pixels=binary_pixels, width=width, height=height, id=id)
         return v
 

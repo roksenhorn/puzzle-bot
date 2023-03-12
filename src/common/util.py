@@ -1,4 +1,5 @@
 import math
+from PIL import Image
 from typing import List, Tuple
 from shapely.geometry import Polygon, Point, LineString
 from scipy.spatial.distance import directed_hausdorff
@@ -15,6 +16,27 @@ CYAN = '\033[36m'
 PURPLE = '\033[35m'
 WHITE = '\033[0m'
 BLACK_ON_WHITE = '\033[30;47m'
+
+
+def load_binary_image(path):
+    """
+    Given a bitmap image path, returns a 2D array of 1s and 0s
+    """
+    with Image.open(path) as img:
+        # Get image data as a 1D array of pixels
+        width, height = img.size
+        pixels = list(img.getdata())
+
+    # Convert pixels to 0 or 1 2D array
+    binary_pixels = []
+    for i, pixel in enumerate(pixels):
+        x = i % width
+        y = i // width
+        if y >= len(binary_pixels):
+            binary_pixels.append([])
+        binary_pixels[y].append(1 if pixel > 0 else 0)
+
+    return binary_pixels, width, height
 
 
 def ramer_douglas_peucker(points, epsilon):
