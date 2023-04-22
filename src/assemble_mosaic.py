@@ -81,15 +81,24 @@ class Mosaic(object):
         return new_pixels
 
 
+SSD_SEARCH_RADIUS = 0 # 5 is a value that is fast but still accounts for some slop
+INPUT_UNITS_TO_PIXEL_RATIO = 1080
+THRESHOLD = 170
+SCALE_BY = 1.0
+
+
 def grow(mosaic, new_path, photo_origin):
-    (pixels, w, h) = segment.segment(filename=new_path, clean_and_crop=False)
+    (pixels, w, h) = segment.segment(filename=new_path, threshold=THRESHOLD, scale_by=SCALE_BY, clean_and_crop=False)
     print(f"Adding {new_path.split('/')[-1]} @ {photo_origin} ({w}x{h}) to mosaic...")
     minx, miny = None, None
     min_ssd = None
-    for x in range(-5, 6):
-        for y in range(-5, 6):
-            xx = x + (photo_origin[0] - mosaic.origin[0]) + mosaic.pixels_origin[0]
-            yy = y + (photo_origin[1] - mosaic.origin[1]) + mosaic.pixels_origin[1]
+    for x in range(-SSD_SEARCH_RADIUS, SSD_SEARCH_RADIUS + 1):
+        for y in range(-SSD_SEARCH_RADIUS, SSD_SEARCH_RADIUS + 1):
+            xx = x + INPUT_UNITS_TO_PIXEL_RATIO * (photo_origin[0] - mosaic.origin[0]) + mosaic.pixels_origin[0]
+            yy = y + INPUT_UNITS_TO_PIXEL_RATIO * (photo_origin[1] - mosaic.origin[1]) + mosaic.pixels_origin[1]
+            xx = round(xx)
+            yy = round(yy)
+            print(xx, yy)
             ssd, scaled = _ssd(mosaic, pixels, w, h, xx, yy)
             if ssd is None:
                 # no overlap
@@ -122,13 +131,11 @@ def _ssd(mosaic, pixels, w, h, x, y):
 
             ssd += (pval - mval) ** 2
             count += 1
-    if count == 0:
-        return None
-    return ssd, ssd/count
+    return ssd, (ssd/count if count else 1000000)
 
 
 def build_from_directory(directory_path, position_data, start_index=1, output_path=None):
-    pixels, w, h = segment.segment(filename=os.path.join(directory_path, f"{start_index}.jpg"), clean_and_crop=False)
+    pixels, w, h = segment.segment(filename=os.path.join(directory_path, f"{start_index}.jpg"), threshold=THRESHOLD, scale_by=SCALE_BY, clean_and_crop=False)
     mosaic = Mosaic(pixels, w, h, origin=position_data[start_index])
 
     i = start_index + 1
@@ -138,7 +145,7 @@ def build_from_directory(directory_path, position_data, start_index=1, output_pa
         grow(mosaic, new_path, photo_origin)
         i += 1
 
-    mosaic.print()
+    # mosaic.print()
     if output_path:
         mosaic.save(output_path)
 
