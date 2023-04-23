@@ -13,7 +13,7 @@ CONNECTIVITY_DIR = '3_connectivity'
 SOLUTION_DIR = '4_solution'
 
 
-def solve(path, id, skip_step, stop_step):
+def solve(path, serialize, id, skip_step, stop_step):
     start_time = time.time()
 
     for d in [INPUT_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]:
@@ -23,7 +23,7 @@ def solve(path, id, skip_step, stop_step):
         segment_each(input_path=os.path.join(path, INPUT_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if skip_step < 1 and stop_step > 1:
-        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id)
+        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
     if skip_step < 2 and stop_step > 2:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id)
@@ -65,7 +65,7 @@ def segment_each(input_path, output_path, id):
     print(f"Segmenting took {round(duration, 2)} seconds ({round(duration/i, 2)} seconds per image)")
 
 
-def vectorize(input_path, output_path, id):
+def vectorize(input_path, output_path, id, serialize):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
@@ -73,22 +73,36 @@ def vectorize(input_path, output_path, id):
 
     start_time = time.time()
     i = id if id is not None else 1
-    pool = multiprocessing.Pool()
-    with multiprocessing.Pool(processes=8) as pool:
+
+    if serialize:
         results = []
         while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
             print(f"> Vectorizing {i}.bmp")
             path = os.path.join(input_path, f'{i}.bmp')
             vectorize = vector.Vector.from_file(filename=path, id=i)
             render = (i == id)
-            results.append(pool.apply_async(vectorize.process, args=(output_path, render)))
+            results.append(vectorize.process(output_path, render))
 
             i += 1
             if id is not None:
                 break
+    else:
+        pool = multiprocessing.Pool()
+        with multiprocessing.Pool(processes=8) as pool:
+            results = []
+            while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
+                print(f"> Vectorizing {i}.bmp")
+                path = os.path.join(input_path, f'{i}.bmp')
+                vectorize = vector.Vector.from_file(filename=path, id=i)
+                render = (i == id)
+                results.append(pool.apply_async(vectorize.process, args=(output_path, render)))
 
-        for r in results:
-            r.get()
+                i += 1
+                if id is not None:
+                    break
+
+            for r in results:
+                r.get()
 
     duration = time.time() - start_time
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
@@ -122,5 +136,6 @@ if __name__ == '__main__':
     parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=int)
     parser.add_argument('--skip-step', default=-1, required=False, help='Start processing from after this step', type=int)
     parser.add_argument('--stop-at-step', default=10, required=False, help='Stop processing at this step', type=int)
+    parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
     args = parser.parse_args()
-    solve(path=args.path, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
+    solve(path=args.path, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)

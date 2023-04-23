@@ -120,6 +120,20 @@ def compare_angles(angle1, angle2):
     return min(diff, 2*math.pi - diff)
 
 
+def centroid(polygon):
+    """
+    Calculates the centroid of a polygon.
+    :param polygon: List of (x,y) tuples representing the polygon.
+    :return: The centroid of the polygon.
+    """
+    x = 0
+    y = 0
+    for point in polygon:
+        x += point[0]
+        y += point[1]
+    return x // len(polygon), y // len(polygon)
+
+
 def intersection(line1, line2):
     """
     Calculates the intersection between two line segments.

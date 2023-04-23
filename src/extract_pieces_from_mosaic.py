@@ -18,10 +18,14 @@ def extract_pieces(input_path, n, output_path=None):
 
     # sort islands (which is a list of list) by len of each island
     islands.sort(key=lambda i: len(i), reverse=True)
-    islands = islands[0:n]
+    found_count = 0
     for i, island in enumerate(islands):
         print(f"[{i + 1}] Island with {len(island)} pixels")
-        extract_piece(i + 1, island, output_path)
+        if extract_piece(i + 1, island, output_path):
+            found_count += 1
+
+        if found_count == n:
+            break
 
 
 def extract_piece(piece_id, piece_coordinates, output_path=None):
@@ -32,6 +36,10 @@ def extract_piece(piece_id, piece_coordinates, output_path=None):
     width = (maxx - minx + 1) + (2 * BORDER_WIDTH_PX)
     height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
     print(f"{width} x {height}")
+
+    if width < 0.4 * height or height < 0.4 * width:
+        print(f"Skipping piece {piece_id} because it is too thin")
+        return False
 
     pixels = []
     for i in range(height):
@@ -48,6 +56,8 @@ def extract_piece(piece_id, piece_coordinates, output_path=None):
         img = Image.new('1', (width, height))
         img.putdata([pixel for row in pixels for pixel in row])
         img.save(os.path.join(output_path, f'{piece_id}.bmp'))
+
+    return True
 
 
 if __name__ == "__main__":

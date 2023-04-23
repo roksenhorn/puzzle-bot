@@ -3,6 +3,7 @@ import os
 import yaml
 from PIL import Image
 from typing import List, Tuple
+import numpy as np
 
 from common import sides, util
 
@@ -45,8 +46,9 @@ class Vector(object):
         self.simplify()
 
         try:
+            self.find_four_corners()
+            self.insert_corners()
             self.find_four_sides()
-            self.extend_sides_to_corners()
         except Exception as e:
             self.render()
             raise e
@@ -201,175 +203,107 @@ class Vector(object):
         self.merge_close_points(vs, threshold=MERGE_IF_CLOSER_THAN_PX)
 
         self.vertices = vs
+        self.centroid = util.centroid(self.vertices)
 
-    def should_join_to_snake(self, snake, point) -> bool:
-        angle_tail = util.angle_between(snake[-2], snake[-1])
-        angle_to_candidate = util.angle_between(snake[-1], point)
-        return util.compare_angles(angle_tail, angle_to_candidate) < SIDE_PARALLEL_THRESHOLD_DEG * math.pi/180
+    def find_four_corners(self):
+        # let's further simplify the shape, because this will lengthen the gap between vertices on flat parts
+        vertices = util.ramer_douglas_peucker(self.all_vertices, epsilon=2 * SIMPLIFY_EPSILON)
+        self.merge_close_points(vertices, threshold=3 * MERGE_IF_CLOSER_THAN_PX)
+        self.corners = []
 
-    def _closest_vertex(self, p, vs):
-        min_dist = None
-        min_i = None
-        for i, v in enumerate(vs):
-            dist = util.distance(p, v)
-            if min_dist is None or dist < min_dist:
-                min_dist = dist
-                min_i = i
-        return (min_dist, min_i)
+        # to find a corner, we're going to compute the angle between 3 consecutive points
+        # if it is roughly 90º and pointed toward the center, it's a corner
+        for i in range(len(vertices)):
+            h = (i - 1) % len(vertices)
+            j = (i + 1) % len(vertices)
+            p_h = vertices[h]
+            p_i = vertices[i]
+            p_j = vertices[j]
 
-    def _pull_vertices_between(self, p1, p2, vs):
-        _, min_index1 = self._closest_vertex(p1, vs)
-        _, min_index2 = self._closest_vertex(p2, vs)
-        return util.slice(vs, min_index1, min_index2)
+            # sides will have relatively low curvature, so let's expect vertices to be spaced out if we're on a corner
+            if util.distance(p_h, p_i) < 5 or util.distance(p_i, p_j) < 5:
+                continue
+
+            a_h = util.angle_between(p_i, p_h)
+            a_j = util.angle_between(p_i, p_j)
+            a_c = util.angle_between(p_i, self.centroid)
+            d_hj = util.compare_angles(a_h, a_j)
+            d_hc = util.compare_angles(a_h, a_c)
+            d_jc = util.compare_angles(a_j, a_c)
+
+            print(f"{i} \t {round(a_h * 180 / math.pi)} \t {round(a_j * 180 / math.pi)} \t {round(a_c * 180 / math.pi)}")
+            print(f"\t {round(d_hj * 180 / math.pi)} \t {round(d_hc * 180 / math.pi)} \t {round(d_jc * 180 / math.pi)}")
+
+            # See if the delta between the two legs is roughly 90º
+            is_roughly_90 = abs(d_hj - math.pi/2) < SIDES_ORTHOGONAL_THRESHOLD_DEG * math.pi/180
+
+            # See if it's pointed toward the center by saying the angle between vector to center and to a given leg is
+            # smaller than the total angle, meaning the vector to center is between the vector ij and vector ih
+            is_pointed_toward_center = d_hc < d_hj and d_jc < d_hj
+            is_pointed_toward_center &= d_hc < 65 * math.pi/180 and d_jc < 65 * math.pi/180
+
+            print(f"\t {is_roughly_90} \t {is_pointed_toward_center}")
+            is_corner = is_roughly_90 and is_pointed_toward_center
+            if is_corner:
+                print(f"Found corner at {i}")
+                self.corners.append(p_i)
+
+        self.vertices = vertices  # set for debugging
+        self.render()
+
+        self.vertices = self.all_vertices
+        self.render()
+
+        if len(self.corners) != 4:
+            self.vertices = simplified_vertices  # set for debugging
+            raise Exception(f"Expected 4 corners, found {len(self.corners)} on piece {self.id}")
+
+    def insert_corners(self) -> None:
+        """
+        The corners aren't necessarily existing vertices, so we need to insert them into the list of vertices
+        """
+        for corner in self.corners:
+            # loop through our vertices until we find either an exact match (then we do nothing)
+            # or we find the closest insertion point, and add it in there
+            match = False
+            min_d_ij = float("inf")
+            min_i = None
+            for i in range(len(self.vertices)):
+                v_i = self.vertices[i]
+                v_j = self.vertices[(i + 1) % len(self.vertices)]
+                if corner == v_i:
+                    match = True
+                    break
+
+                # we can't just find the closest vertex, because we might need to insert before that one
+                # so we find the closest pair of vertices and insert between them
+                d_i = util.distance(corner, v_i)
+                d_j = util.distance(corner, v_j)
+                d_sum = d_i + d_j
+                if d_sum < min_d_ij:
+                    min_d_ij = d_sum
+                    min_i = i
+
+            if match:
+                # this corner is already in the list of vertices
+                print(f"Corner {corner} already exists in vertices")
+                continue
+
+            # otherwise, add after index min_i
+            self.vertices.insert(min_i + 1, corner)
+            print(f"Inserted corner {corner} after index {min_i}")
 
     def find_four_sides(self) -> None:
         """
-        Finds the 4 vertices that represent the corners of the piece
-        A side either has 2 vertices if it is a perfectly flat edge,
-        or it has 4 vertices if there is a prong sticking out or poking in (2 adjacent, then a few vertices for the prong, then 2 more vertices)
+        Once we've found the corners, we'll identify which vertices belong to each side
+        We do some validation to make sure the geometry of the piece is sensible
         """
         self.sides = []
 
-        # grow snakes as long as they don't have any sharp bends
-        vs = list(self.vertices)
-        vs.append(vs[0])
-        snakes = []
-        while len(vs) > 0:
-            snake = [vs.pop(0), vs.pop(0)]
-            continue_snake = True
-            while continue_snake and len(vs) > 0:
-                candidate = vs[0]
-                if self.should_join_to_snake(snake, candidate):
-                    snake.append(vs.pop(0))
-                    continue_snake = True
-                else:
-                    # let the next snake start with the last point of this snake
-                    vs.insert(0, snake[-1])
-                    continue_snake = False
-            snakes.append(snake)
+        # first we have to figure out where our corners should be inserted as vertices
 
-        # see if we should connect the last snake to the first
-        assert snakes[0][0] == snakes[-1][-1]
-        if self.should_join_to_snake(snakes[-1], snakes[0][1]):
-            merge = snakes[-1] + snakes[0][1:]
-            snakes[0] = merge
-            snakes.pop(-1)
-
-        snakes = [s for s in snakes if util.distance(s[0], s[-1]) > 0.09 * self.dim]
-
-        # for snake in snakes:
-        #     print("Snake: ", snake, "len: ", util.distance(snake[0], snake[-1]))
-
-        claimed_snakes = []
-
-        # find snakes we're "collinear" with
-        for snake in snakes:
-            # if we're already dancing with someone else, we've been claimed and won't explore any further
-
-            debug = False
-            if snake[0] == (601, 2):
-                print("\n>>>> ", snake)
-                debug = True
-
-            if snake in claimed_snakes:
-                continue
-
-            # see if each other snake is collinear with us
-            for other_snake in snakes:
-                if snake == other_snake:
-                    continue
-
-                # first, they can't be ridiculously far away
-                gap = util.distance(snake[-1], other_snake[0])
-                snakes_close_enough = (gap < 0.35 * self.dim)
-
-                # they also need to sum up to enough of a flat edge
-                total_len = util.distance(snake[0], snake[-1]) + util.distance(other_snake[0], other_snake[-1])
-                enough_flat_side = total_len > 0.3 * self.dim
-
-                # and last but not least, they need to be somewhat collinear
-                # we define this as roughly the same angle, and their bounding boxes overlap
-                angle_snake = util.angle_between(snake[0], snake[-1])
-                angle_other = util.angle_between(other_snake[0], other_snake[-1])
-                angles_close_enough = util.compare_angles(angle_snake, angle_other) < 2 * SIDE_PARALLEL_THRESHOLD_DEG * math.pi/180
-
-                # determine how colinear the two snakes are
-                # if they are far apart, then the line that connects them should be roughly parallel to both snakes
-                # if they are really close, then they just need to be roughly parallel to each other
-                angle_bridge = util.angle_between(snake[-1], other_snake[0])
-                bridge_angle_between = util.compare_angles(angle_snake, angle_bridge) < SIDE_PARALLEL_THRESHOLD_DEG * math.pi/180
-                bridge_angle_between = bridge_angle_between and util.compare_angles(angle_other, angle_bridge) < 1.3 * SIDE_PARALLEL_THRESHOLD_DEG * math.pi/180
-                dist_between_snakes = util.distance(snake[-1], other_snake[0])
-                really_close = dist_between_snakes < 8
-
-                collinear = angles_close_enough and (bridge_angle_between or really_close)
-
-                if debug:
-                    print(other_snake)
-                    print(f"gap: {gap} < {0.35 * self.dim}, total_len: {total_len} > {0.3 * self.dim}, angle_snake {angle_snake}, {angle_other}, {angle_bridge} angles_close_enough: {angles_close_enough}, bridge_angle_between: {bridge_angle_between}, really_close: {really_close}, collinear: {collinear}")
-
-                # let's make sure we'd join these two snakes with the line that connects them
-                if snakes_close_enough and enough_flat_side and collinear:
-                    # print("We've found a partner!", snake, other_snake)
-                    claimed_snakes.append(snake)
-                    claimed_snakes.append(other_snake)
-
-                    i = self.vertices.index(snake[0])
-                    j = self.vertices.index(other_snake[-1])
-
-                    # check if this is an edge or not
-                    vs = util.slice(self.vertices, i, j)
-                    dist_i_j = util.distance(vs[0], vs[-1])
-                    side_perimeter = 0
-                    for k in range(len(vs) - 1):
-                        side_perimeter += util.distance(vs[k], vs[k+1])
-
-                    # if the perimeter of the side is approx equal to the dist from start to end, it's a flat edge
-                    if abs(side_perimeter - dist_i_j) < 0.04 * (side_perimeter + dist_i_j)/2.0:
-                        is_edge = True
-                    else:
-                        is_edge = False
-
-                    new_side = sides.Side(piece_id=self.id, side_id=None, vertices=self._pull_vertices_between(vs[0], vs[-1], self.dense_vertices), piece_center=self.center, is_edge=is_edge)
-                    self.sides.append(new_side)
-                    break
-
-        # for any that weren't paired up, see if they are in fact a complete flat edge
-        for snake in snakes:
-            # ignore any that are a part of a non-edge side
-            if snake in claimed_snakes:
-                continue
-
-            # we say a snake is long enough to be an edge if it is the majority of that dimension
-            # so if it lies flat, it should be most of the width
-            # if it is vertical, it should be most of the height
-            snake_len = util.distance(snake[0], snake[-1])
-            snake_angle = util.angle_between(snake[0], snake[-1])
-            dim = self.height + (self.width - self.height) * (1 + math.cos(2 * snake_angle)) / 2
-
-            if snake_len > EDGE_WIDTH_MIN_RATIO * dim:
-                # print("Snake:", snake, "len:", round(snake_len), "@ angle:", round(snake_angle * 180/math.pi), "new dim:", round(dim), self.width, self.height)
-                new_side = sides.Side(piece_id=self.id, side_id=None, vertices=self._pull_vertices_between(snake[0], snake[-1], self.dense_vertices), piece_center=self.center, is_edge=True)
-                self.sides.append(new_side)
-
-        # put in clockwise order
-        sorted_sides = sorted(self.sides, key=lambda s: s.angle)
-        self.sides = []
-
-        # drop any sides that don't connect near the other sides
-        # print("RESULT:")
-        for i, s in enumerate(sorted_sides):
-            k = (i - 1) % len(sorted_sides)
-            j = (i + 1) % len(sorted_sides)
-            prior_side = sorted_sides[k]
-            next_side = sorted_sides[j]
-
-            if util.distance(prior_side.vertices[-1], s.vertices[0]) <= 10 \
-                or util.distance(next_side.vertices[0], s.vertices[-1]) <= 10:
-                self.sides.append(s)
-            #     print(" - ", s)
-            # else:
-            #     print(f"dropping {s}")
+        # new_side = sides.Side(piece_id=self.id, side_id=None, vertices=self._pull_vertices_between(vs[0], vs[-1], self.dense_vertices), piece_center=self.center, is_edge=is_edge)
+        # self.sides.append(new_side)
 
         # we need to find 4 sides
         if len(self.sides) != 4:
@@ -389,12 +323,12 @@ class Vector(object):
         lengths = [s.length for s in self.sides]
         len_ratio02 = abs(lengths[0] - lengths[2])/lengths[0]
         len_ratio13 = abs(lengths[1] - lengths[3])/lengths[1]
-        if len_ratio02 > 0.3 or len_ratio13 > 0.3:
+        if len_ratio02 > 0.35 or len_ratio13 > 0.35:
             raise Exception(f"Expected sides to be roughly the same length, but they are not ({len_ratio02}, {len_ratio13})")
 
         d02 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
         d13 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
-        if d02 > 1.25 * d13 or d13 > 1.25 * d02:
+        if d02 > 1.35 * d13 or d13 > 1.35 * d02:
             raise Exception(f"Expected the piece to be roughly square, but the distance between sides is not comparable ({d02} vs {d13})")
 
         edge_count = sum([s.is_edge for s in self.sides])
@@ -403,50 +337,6 @@ class Vector(object):
         elif edge_count == 2:
             if (self.sides[0].is_edge and self.sides[2].is_edge) or (self.sides[1].is_edge and self.sides[3].is_edge):
                 raise Exception("A piece cannot be a part of two edges that are parallel!")
-
-    def extend_sides_to_corners(self) -> None:
-        """
-        Grow the sides to the corners of the piece
-        """
-        for corner in range(4):
-            j = (corner - 1) % 4
-            side_after = self.sides[corner]
-            side_before = self.sides[j]
-
-            intersection = util.intersection((side_before.vertices[-5], side_before.vertices[-2]), (side_after.vertices[1], side_after.vertices[4]))
-            corner_vi = self.all_vertices.index(side_after.p1)
-
-            closest_i = None
-            closest_dist = None
-            for i in range(corner_vi - 4, corner_vi + 5):
-                v = self.all_vertices[i % len(self.all_vertices)]
-                dist = util.distance(v, intersection)
-                if closest_dist is None or dist < closest_dist:
-                    closest_dist = dist
-                    closest_i = i % len(self.all_vertices)
-
-                if v in side_before.vertices:
-                    j = side_before.vertices.index(v)
-                    side_before.vertices.pop(j)
-                if v in side_after.vertices:
-                    j = side_after.vertices.index(v)
-                    side_after.vertices.pop(j)
-
-            # print(f"Corner {corner} is at {side_after.p1} (index {corner_vi}), intersection is {intersection}")
-            # print(f"\tClosest point to intersection is {self.all_vertices[closest_i]} (@ {closest_i}), distance is {closest_dist}")
-            corner_vertex = self.all_vertices[closest_i]
-            side_before.vertices.append(corner_vertex)
-            side_after.vertices.insert(0, corner_vertex)
-            side_before.recompute_endpoints()
-            side_after.recompute_endpoints()
-
-        self.vertices = []
-        for i, side in enumerate(self.sides):
-            if i == 0:
-                self.vertices.extend(side.vertices)
-            else:
-                self.vertices.extend(side.vertices[1:])
-        self.vertices = self.vertices[:-1]
 
     def render(self) -> None:
         SIDE_COLORS = [util.RED, util.GREEN, util.PURPLE, util.CYAN]

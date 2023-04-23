@@ -84,7 +84,7 @@ class Mosaic(object):
 SSD_SEARCH_RADIUS = 0 # 5 is a value that is fast but still accounts for some slop
 INPUT_UNITS_TO_PIXEL_RATIO = 1080
 THRESHOLD = 170
-SCALE_BY = 1.0
+SCALE_BY = 0.85
 
 
 def grow(mosaic, new_path, photo_origin):
