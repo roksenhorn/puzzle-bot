@@ -48,7 +48,7 @@ class Vector(object):
         try:
             self.find_four_corners()
             self.insert_corners()
-            self.find_four_sides()
+            self.exttract_four_sides()
         except Exception as e:
             self.render()
             raise e
@@ -193,11 +193,6 @@ class Vector(object):
         # save the original vertices
         self.all_vertices = [(v[0], v[1]) for v in vs]
 
-        # create a denser set of vertices that is higher res
-        self.dense_vertices = [(v[0], v[1]) for v in vs]
-        # self.dense_vertices = util.ramer_douglas_peucker(self.dense_vertices, epsilon=0.25)
-        self.merge_close_points(self.dense_vertices, threshold=MERGE_IF_CLOSER_THAN_PX)
-
         # simplify and merge close points
         vs = util.ramer_douglas_peucker(vs, epsilon=SIMPLIFY_EPSILON)
         self.merge_close_points(vs, threshold=MERGE_IF_CLOSER_THAN_PX)
@@ -207,35 +202,40 @@ class Vector(object):
 
     def find_four_corners(self):
         # let's further simplify the shape, because this will lengthen the gap between vertices on flat parts
-        vertices = util.ramer_douglas_peucker(self.all_vertices, epsilon=2 * SIMPLIFY_EPSILON)
-        self.merge_close_points(vertices, threshold=3 * MERGE_IF_CLOSER_THAN_PX)
-        self.corners = []
+        vertices = self.all_vertices
+
+        possible_corners = []
 
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(vertices)):
-            h = (i - 1) % len(vertices)
-            j = (i + 1) % len(vertices)
-            p_h = vertices[h]
             p_i = vertices[i]
-            p_j = vertices[j]
 
-            # sides will have relatively low curvature, so let's expect vertices to be spaced out if we're on a corner
-            if util.distance(p_h, p_i) < 5 or util.distance(p_i, p_j) < 5:
+            # find the angle from i to the points before it (h), and i to the points after (j)
+            vec_len = 12
+            a_h, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len, i-1))
+            a_j, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+1, i+vec_len))
+            max_stdev = max(stdev_h, stdev_j)
+
+            # make sure the segments before and after are approximately flat
+            if max_stdev > 1.0:
                 continue
 
-            a_h = util.angle_between(p_i, p_h)
-            a_j = util.angle_between(p_i, p_j)
+            # and the angle from i to the centroid of the piece
             a_c = util.angle_between(p_i, self.centroid)
+
+            # delta angles
             d_hj = util.compare_angles(a_h, a_j)
             d_hc = util.compare_angles(a_h, a_c)
             d_jc = util.compare_angles(a_j, a_c)
 
-            print(f"{i} \t {round(a_h * 180 / math.pi)} \t {round(a_j * 180 / math.pi)} \t {round(a_c * 180 / math.pi)}")
-            print(f"\t {round(d_hj * 180 / math.pi)} \t {round(d_hc * 180 / math.pi)} \t {round(d_jc * 180 / math.pi)}")
-
             # See if the delta between the two legs is roughly 90º
             is_roughly_90 = abs(d_hj - math.pi/2) < SIDES_ORTHOGONAL_THRESHOLD_DEG * math.pi/180
+            if not is_roughly_90:
+                continue
+
+            print(f"{i} \t {stdev_h}<>{stdev_j} \t {round(a_h * 180 / math.pi)} \t {round(a_j * 180 / math.pi)} \t {round(a_c * 180 / math.pi)}")
+            print(f"\t {round(d_hj * 180 / math.pi)} \t {round(d_hc * 180 / math.pi)} \t {round(d_jc * 180 / math.pi)}")
 
             # See if it's pointed toward the center by saying the angle between vector to center and to a given leg is
             # smaller than the total angle, meaning the vector to center is between the vector ij and vector ih
@@ -245,17 +245,35 @@ class Vector(object):
             print(f"\t {is_roughly_90} \t {is_pointed_toward_center}")
             is_corner = is_roughly_90 and is_pointed_toward_center
             if is_corner:
-                print(f"Found corner at {i}")
-                self.corners.append(p_i)
+                print(f"Found possible corner at {i}")
+                possible_corners.append((i, p_i, max_stdev))
 
-        self.vertices = vertices  # set for debugging
-        self.render()
+        eliminated_corner_indices = []
+        for i, corner, stdev in possible_corners:
+            print(f"Checking corner {i} @ {corner} with stdev {stdev}")
+            if i in eliminated_corner_indices:
+                # if we've been ruled out, no work to do
+                print(f"\t oh wait, corner {i} has been eliminated")
+                continue
 
-        self.vertices = self.all_vertices
-        self.render()
+            for j, corner_j, stdev_j in possible_corners:
+                if i == j:
+                    continue
+
+                # if we're close to another candidate, and our stdev is smaller, we're the better corner
+                # this is because the vectors before and after us are more linear
+                if util.distance(corner, corner_j) < 5 and stdev < stdev_j:
+                    print(f"\t corner {i} is close to {j} and has a smaller stdev; knocking out {j}")
+                    eliminated_corner_indices.append(j)
+
+        # see which corners remain standing
+        self.corners = []
+        for i, corner, _ in possible_corners:
+            if i not in eliminated_corner_indices:
+                self.corners.append(corner)
 
         if len(self.corners) != 4:
-            self.vertices = simplified_vertices  # set for debugging
+            self.vertices = vertices  # set for debugging
             raise Exception(f"Expected 4 corners, found {len(self.corners)} on piece {self.id}")
 
     def insert_corners(self) -> None:
@@ -293,7 +311,7 @@ class Vector(object):
             self.vertices.insert(min_i + 1, corner)
             print(f"Inserted corner {corner} after index {min_i}")
 
-    def find_four_sides(self) -> None:
+    def extract_four_sides(self) -> None:
         """
         Once we've found the corners, we'll identify which vertices belong to each side
         We do some validation to make sure the geometry of the piece is sensible

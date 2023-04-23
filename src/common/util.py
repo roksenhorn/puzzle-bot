@@ -159,6 +159,14 @@ def slice(l: List, i: int, j: int) -> List:
     Grabs a slice from the list, from index i through j
     j can be lower than i, in which case the slice will "wrap" around the list
     """
+    if i < 0:
+        i += len(l)
+    if j < 0:
+        j += len(l)
+    while i > len(l):
+        i -= len(l)
+    while j > len(l):
+        j -= len(l)
     if i < j:
         return l[i:j + 1]
     else:
@@ -362,6 +370,18 @@ def midpoint_along_path(vertices, p1, p2) -> Tuple[int, int]:
             min_max = max(d1, d2)
             min_v = v
     return min_v
+
+
+def colinearity(from_point, to_points) -> Tuple[float, float]:
+    """
+    Given a point and a list of points, finds how "colinear" they are:
+     - the average angle between the point and the points
+     - the std dev of the angles
+    """
+    angles = [angle_between(from_point, to_point) for to_point in to_points]
+    avg = sum(angles) / len(angles)
+    std_dev = math.sqrt(sum([(angle - avg) ** 2 for angle in angles]) / len(angles))
+    return avg, std_dev
 
 
 def find_islands(grid):
