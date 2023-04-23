@@ -25,10 +25,10 @@ def solve(path, serialize, id, skip_step, stop_step):
     if skip_step < 1 and stop_step > 1:
         vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
-    if skip_step < 2 and stop_step > 2:
+    if skip_step < 2 and stop_step > 2 and not id:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id)
 
-    if skip_step < 3 and stop_step > 3:
+    if skip_step < 3 and stop_step > 3 and not id:
         build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
     print('')

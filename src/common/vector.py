@@ -1,9 +1,7 @@
 import math
 import os
 import yaml
-from PIL import Image
 from typing import List, Tuple
-import numpy as np
 
 from common import sides, util
 
@@ -18,7 +16,7 @@ MERGE_IF_CLOSER_THAN_PX = 1.75
 SIDE_PARALLEL_THRESHOLD_DEG = 32
 
 # Adjacent sides must be "orthogonal" within this threshold (in degrees)
-SIDES_ORTHOGONAL_THRESHOLD_DEG = 30
+SIDES_ORTHOGONAL_THRESHOLD_DEG = 38
 
 # A side must be at least this long to be considered an edge
 EDGE_WIDTH_MIN_RATIO = 0.4
@@ -43,14 +41,13 @@ class Vector(object):
     def process(self, output_path=None, render=False):
         self.find_border_raster()
         self.vectorize()
-        self.simplify()
 
         try:
             self.find_four_corners()
-            self.insert_corners()
-            self.exttract_four_sides()
+            self.extract_four_sides()
         except Exception as e:
             self.render()
+            print(f"Error while processing {self.id}:")
             raise e
 
         if render:
@@ -68,13 +65,12 @@ class Vector(object):
         svg += f'<svg width="{3 * self.width}" height="{3 * self.height}" viewBox="-10 -10 {20 + self.width} {20 + self.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
         for i, side in enumerate(self.sides):
             pts = ' '.join([','.join([str(e) for e in v]) for v in side.vertices])
-            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:1.5" />'
-        pts = ' '.join([','.join([str(e) for e in v]) for v in self.vertices + [self.vertices[0]]])
-        svg += f'<polyline points="{pts}" style="fill:#bbbbbb; stroke-width:0" />'
+            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:1.0" />'
         # draw in a small circle for each corner (the first and last vertex for each side)
         for i, side in enumerate(self.sides):
             v = side.vertices[0]
             svg += f'<circle cx="{v[0]}" cy="{v[1]}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
+        svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#990000; stroke-width:0" />'
         svg += '</svg>'
         with open(full_svg_path, 'w') as f:
             f.write(svg)
@@ -120,7 +116,6 @@ class Vector(object):
         if sx is None or sy is None:
             raise Exception(f"Piece @ {self.id} has no border to walk")
 
-        # print(f"Starting at {sx}, {sy}")
         self.vertices = [(sx, sy)]
         cx, cy = sx, sy
         p_angle = 0
@@ -169,6 +164,8 @@ class Vector(object):
             if bx == cx and by == cy:
                 raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")
 
+        self.centroid = util.centroid(self.vertices)
+
     def merge_close_points(self, vs, threshold):
         i = -len(vs)
         while i < len(vs):
@@ -186,23 +183,9 @@ class Vector(object):
             else:
                 i += 1
 
-    def simplify(self) -> None:
-        # first, let's remove any duplicate points
-        vs = list(dict.fromkeys(self.vertices))
-
-        # save the original vertices
-        self.all_vertices = [(v[0], v[1]) for v in vs]
-
-        # simplify and merge close points
-        vs = util.ramer_douglas_peucker(vs, epsilon=SIMPLIFY_EPSILON)
-        self.merge_close_points(vs, threshold=MERGE_IF_CLOSER_THAN_PX)
-
-        self.vertices = vs
-        self.centroid = util.centroid(self.vertices)
-
     def find_four_corners(self):
         # let's further simplify the shape, because this will lengthen the gap between vertices on flat parts
-        vertices = self.all_vertices
+        vertices = self.vertices
 
         possible_corners = []
 
@@ -212,104 +195,92 @@ class Vector(object):
             p_i = vertices[i]
 
             # find the angle from i to the points before it (h), and i to the points after (j)
-            vec_len = 12
-            a_h, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len, i-1))
-            a_j, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+1, i+vec_len))
+            vec_offset = 3  # we start comparing to this many points away, as really short vectors have noisy angles
+            vec_len = 20  # compare this many total points
+            a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
+            a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
             max_stdev = max(stdev_h, stdev_j)
 
+            p_h = (p_i[0] + 10 * math.cos(a_ih), p_i[1] + 10 * math.sin(a_ih))
+            p_j = (p_i[0] + 10 * math.cos(a_ij), p_i[1] + 10 * math.sin(a_ij))
+
             # make sure the segments before and after are approximately flat
-            if max_stdev > 1.0:
+            if max_stdev > 0.3:
                 continue
 
             # and the angle from i to the centroid of the piece
-            a_c = util.angle_between(p_i, self.centroid)
+            vec_ic = util.angle_between(p_i, self.centroid)
 
-            # delta angles
-            d_hj = util.compare_angles(a_h, a_j)
-            d_hc = util.compare_angles(a_h, a_c)
-            d_jc = util.compare_angles(a_j, a_c)
+            # how wide is the angle between the two legs?
+            angle_hij = util.angle_i(p_h, p_i, p_j)
 
             # See if the delta between the two legs is roughly 90º
-            is_roughly_90 = abs(d_hj - math.pi/2) < SIDES_ORTHOGONAL_THRESHOLD_DEG * math.pi/180
+            is_roughly_90 = abs(math.pi/2 - angle_hij) < SIDES_ORTHOGONAL_THRESHOLD_DEG * math.pi/180
             if not is_roughly_90:
                 continue
 
-            print(f"{i} \t {stdev_h}<>{stdev_j} \t {round(a_h * 180 / math.pi)} \t {round(a_j * 180 / math.pi)} \t {round(a_c * 180 / math.pi)}")
-            print(f"\t {round(d_hj * 180 / math.pi)} \t {round(d_hc * 180 / math.pi)} \t {round(d_jc * 180 / math.pi)}")
+            # corners generally open up toward the center of the piece
+            # meaning the mid-angle that comes out of the corner is roughly the same as the angle from the corner to the center
+            angle_ih = util.angle_between(p_i, p_h)
+            opens_toward_angle = util.angle_between(p_i, util.midpoint(p_h, p_j))
+            offset_from_center = util.compare_angles(opens_toward_angle, vec_ic)
+            CORNER_OPENS_TOWARD_CENTER_THRESHOLD_DEG = 85
+            is_pointed_toward_center = offset_from_center < CORNER_OPENS_TOWARD_CENTER_THRESHOLD_DEG * math.pi/180
 
-            # See if it's pointed toward the center by saying the angle between vector to center and to a given leg is
-            # smaller than the total angle, meaning the vector to center is between the vector ij and vector ih
-            is_pointed_toward_center = d_hc < d_hj and d_jc < d_hj
-            is_pointed_toward_center &= d_hc < 65 * math.pi/180 and d_jc < 65 * math.pi/180
-
-            print(f"\t {is_roughly_90} \t {is_pointed_toward_center}")
-            is_corner = is_roughly_90 and is_pointed_toward_center
+            is_corner = is_roughly_90 # and is_pointed_toward_center or (p_i[1] == 170 and p_i[0] < 50)
             if is_corner:
-                print(f"Found possible corner at {i}")
-                possible_corners.append((i, p_i, max_stdev))
+                # print(f"Found possible corner at {i}: {p_i} w/ {max_stdev}")
+                # print(f"\t h={p_h} \t i={p_i} \t j={p_j} \t c={self.centroid} \t ic={round(vec_ic * 180 / math.pi)} \t ih={round(angle_ih * 180 / math.pi)}")
+                # print(f"\t angle width: {round(angle_hij * 180 / math.pi)}")
+                # print(f"\t roughly 90? {is_roughly_90} \t toward center? {is_pointed_toward_center} \t open toward {round(opens_toward_angle * 180 / math.pi)} \t offset from center {round(offset_from_center * 180 / math.pi)}")
+                possible_corners.append((i, p_i, angle_hij, max_stdev, offset_from_center))
 
         eliminated_corner_indices = []
-        for i, corner, stdev in possible_corners:
-            print(f"Checking corner {i} @ {corner} with stdev {stdev}")
+        for i, corner, angle, stdev, offset_from_center in possible_corners:
+            # print(f"Checking corner {i} @ {corner} with angle {round(angle * 180 / math.pi)}, stdev {stdev}")
             if i in eliminated_corner_indices:
                 # if we've been ruled out, no work to do
-                print(f"\t oh wait, corner {i} has been eliminated")
+                # print(f"\t oh wait, corner {i} has been eliminated")
                 continue
 
-            for j, corner_j, stdev_j in possible_corners:
+            for j, corner_j, angle, stdev_j, _ in possible_corners:
                 if i == j:
                     continue
 
                 # if we're close to another candidate, and our stdev is smaller, we're the better corner
                 # this is because the vectors before and after us are more linear
-                if util.distance(corner, corner_j) < 5 and stdev < stdev_j:
-                    print(f"\t corner {i} is close to {j} and has a smaller stdev; knocking out {j}")
+                if util.distance(corner, corner_j) < 10 and stdev <= stdev_j:
+                    # print(f"\t corner {i} is close to {j} and has a smaller stdev; knocking out {j}")
                     eliminated_corner_indices.append(j)
 
-        # see which corners remain standing
-        self.corners = []
-        for i, corner, _ in possible_corners:
-            if i not in eliminated_corner_indices:
-                self.corners.append(corner)
+        possible_corners = [c for c in possible_corners if c[0] not in eliminated_corner_indices]
 
-        if len(self.corners) != 4:
-            self.vertices = vertices  # set for debugging
-            raise Exception(f"Expected 4 corners, found {len(self.corners)} on piece {self.id}")
+        if len(possible_corners) < 4:
+            raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
 
-    def insert_corners(self) -> None:
-        """
-        The corners aren't necessarily existing vertices, so we need to insert them into the list of vertices
-        """
-        for corner in self.corners:
-            # loop through our vertices until we find either an exact match (then we do nothing)
-            # or we find the closest insertion point, and add it in there
-            match = False
-            min_d_ij = float("inf")
-            min_i = None
-            for i in range(len(self.vertices)):
-                v_i = self.vertices[i]
-                v_j = self.vertices[(i + 1) % len(self.vertices)]
-                if corner == v_i:
-                    match = True
-                    break
+        # for i, (v_i, corner, angle, stdev, offset) in enumerate(possible_corners):
+        #     print(f"Corner {i} @ {corner} has angle {round(angle * 180 / math.pi)}, stdev {stdev}, offset {round(offset * 180 / math.pi)}")
 
-                # we can't just find the closest vertex, because we might need to insert before that one
-                # so we find the closest pair of vertices and insert between them
-                d_i = util.distance(corner, v_i)
-                d_j = util.distance(corner, v_j)
-                d_sum = d_i + d_j
-                if d_sum < min_d_ij:
-                    min_d_ij = d_sum
-                    min_i = i
+        while len(possible_corners) > 4:
+            # eliminate the worst "corners"
+            # we determine "worst" by a mix of:
+            # - how far from 90º the angle is
+            # - how non-straight the spokes are
+            # - how far from the center the corner opens up to
+            max_mix = 0
+            max_i = 0
+            for i, (v_i, corner, angle, stdev, offset) in enumerate(possible_corners):
+                angle_error = angle - math.pi/2  # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
+                mixing = angle_error + stdev + 2*offset
+                if mixing > max_mix:
+                    max_mix = mixing
+                    max_i = i
 
-            if match:
-                # this corner is already in the list of vertices
-                print(f"Corner {corner} already exists in vertices")
-                continue
+            popped = possible_corners.pop(max_i)
+            # print(f"Popped a bad corner: {popped}")
 
-            # otherwise, add after index min_i
-            self.vertices.insert(min_i + 1, corner)
-            print(f"Inserted corner {corner} after index {min_i}")
+        self.corners = [c[1] for c in possible_corners]
+        self.corner_indices = [c[0] for c in possible_corners]
 
     def extract_four_sides(self) -> None:
         """
@@ -318,10 +289,29 @@ class Vector(object):
         """
         self.sides = []
 
-        # first we have to figure out where our corners should be inserted as vertices
+        for i in range(4):
+            # yank out all the relevant vertices for this side
+            j = (i + 1) % 4
+            c_i = self.corner_indices[i]
+            c_j = self.corner_indices[j]
+            vertices = util.slice(self.vertices, c_i, c_j)
 
-        # new_side = sides.Side(piece_id=self.id, side_id=None, vertices=self._pull_vertices_between(vs[0], vs[-1], self.dense_vertices), piece_center=self.center, is_edge=is_edge)
-        # self.sides.append(new_side)
+            # do a bit of simplification
+            vertices = util.ramer_douglas_peucker(vertices, epsilon=0.25)
+            self.merge_close_points(vertices, threshold=MERGE_IF_CLOSER_THAN_PX)
+
+            # make sure to include the true endpoints
+            if vertices[0] != self.corners[i]:
+                vertices.insert(0, self.corners[i])
+            if vertices[-1] != self.corners[j]:
+                vertices.append(self.corners[j])
+
+            # edges are flat and thus have very little variance from the average line between all points
+            _, stdev = util.colinearity(from_point=vertices[0], to_points=vertices[1:])
+            is_edge = stdev < 0.06
+
+            side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
+            self.sides.append(side)
 
         # we need to find 4 sides
         if len(self.sides) != 4:
@@ -341,7 +331,7 @@ class Vector(object):
         lengths = [s.length for s in self.sides]
         len_ratio02 = abs(lengths[0] - lengths[2])/lengths[0]
         len_ratio13 = abs(lengths[1] - lengths[3])/lengths[1]
-        if len_ratio02 > 0.35 or len_ratio13 > 0.35:
+        if len_ratio02 > 0.55 or len_ratio13 > 0.55:
             raise Exception(f"Expected sides to be roughly the same length, but they are not ({len_ratio02}, {len_ratio13})")
 
         d02 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
@@ -366,32 +356,25 @@ class Vector(object):
                 line.append('# ' if pixel == 1 else '. ')
             lines.append(line)
 
-        for i, (px, py) in enumerate(self.vertices):
-            color = util.BLACK_ON_WHITE  # orphans
-            for si, side in enumerate(self.sides):
-                if side.p1 == (px, py) or side.p2 == (px, py):
-                    color = util.YELLOW
-                    break
-                elif (px, py) in side.vertices:
-                    color = SIDE_COLORS[si % len(SIDE_COLORS)]
-                    break
-            if py >= len(lines) or px >= len(lines[py]):
-                continue
-            lines[py][px] = f"{color}{str(i % 10)} {util.WHITE}"
+        i = 0
+        for si, side in enumerate(self.sides):
+            for (px, py) in side.vertices:
+                color = SIDE_COLORS[si % len(SIDE_COLORS)]
+                if py >= len(lines) or px >= len(lines[py]):
+                    continue
+                lines[py][px] = f"{color}{str(i % 10)} {util.WHITE}"
+
+        for (px, py) in self.corners:
+            value = lines[py][px].split(' ')[0][-1]
+            lines[py][px] = f"{util.BLACK_ON_BLUE}{value} {util.WHITE}"
+
+        lines[self.centroid[1]][self.centroid[0]] = f"{util.BLACK_ON_RED}X {util.WHITE}"
 
         print(f' {util.GRAY} ' + 'v ' * self.width + f"{util.WHITE}")
-        for line in lines:
+        for i, line in enumerate(lines):
             line = ''.join(line)
-            print(f'{util.GRAY}> {util.WHITE}{line}{util.GRAY}<{util.WHITE}')
+            print(f'{util.GRAY}> {util.WHITE}{line}{util.GRAY}<{util.WHITE} {i}')
         print(f' {util.GRAY} ' + '^ ' * self.width + f"{util.WHITE}")
-
-    @property
-    def center(self) -> Tuple[int, int]:
-        minx = min([x for x,_ in self.vertices])
-        maxx = max([x for x,_ in self.vertices])
-        miny = min([y for _,y in self.vertices])
-        maxy = max([y for _,y in self.vertices])
-        return (minx + maxx) // 2, (miny + maxy) // 2
 
     def compare(self, piece) -> float:
         """

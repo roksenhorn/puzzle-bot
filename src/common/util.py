@@ -16,6 +16,8 @@ CYAN = '\033[36m'
 PURPLE = '\033[35m'
 WHITE = '\033[0m'
 BLACK_ON_WHITE = '\033[30;47m'
+BLACK_ON_BLUE = '\033[30;44m'
+BLACK_ON_RED = '\033[30;41m'
 
 
 def load_binary_image(path):
@@ -126,12 +128,9 @@ def centroid(polygon):
     :param polygon: List of (x,y) tuples representing the polygon.
     :return: The centroid of the polygon.
     """
-    x = 0
-    y = 0
-    for point in polygon:
-        x += point[0]
-        y += point[1]
-    return x // len(polygon), y // len(polygon)
+    poly = Polygon(polygon)
+    centroid = poly.centroid
+    return (int(round(centroid.x)), int(round(centroid.y)))
 
 
 def intersection(line1, line2):
@@ -171,6 +170,27 @@ def slice(l: List, i: int, j: int) -> List:
         return l[i:j + 1]
     else:
         return l[i:] + l[:j + 1]
+
+
+def angle_i(h, i, j):
+    """
+    Calculates the angle between two vectors, i->h and i->j
+            j
+    h
+           θ <--- angle
+           i
+    """
+    ih = (h[0] - i[0], h[1] - i[1])
+    ij = (j[0] - i[0], j[1] - i[1])
+
+    dot_product = sum(x1 * x2 for x1, x2 in zip(ih, ij))
+    v1_magnitude = math.sqrt(sum(x**2 for x in ih))
+    v2_magnitude = math.sqrt(sum(x**2 for x in ij))
+
+    cos_angle = dot_product / (v1_magnitude * v2_magnitude)
+    angle = math.acos(cos_angle)
+    return angle
+
 
 
 def rotate(v: Tuple[int, int], around: Tuple[int, int], angle: float) -> Tuple[int, int]:
@@ -354,6 +374,13 @@ def tight_bounds(poly1, poly2):
         min(bounds1[2], bounds2[2]),
         min(bounds1[3], bounds2[3]),
     )
+
+
+def midpoint(p1, p2):
+    """
+    Returns the midpoint between two points
+    """
+    return ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
 
 
 def midpoint_along_path(vertices, p1, p2) -> Tuple[int, int]:
