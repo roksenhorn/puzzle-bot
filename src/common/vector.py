@@ -193,87 +193,126 @@ class Vector(object):
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(vertices)):
             p_i = vertices[i]
+            debug =(p_i[1] == 719)
+            if debug:
+                print(f"\n\n\n!!!!!!!!!!!!!! {p_i} !!!!!!!!!!!!!!!\n\n\n")
 
             # find the angle from i to the points before it (h), and i to the points after (j)
-            vec_offset = 3  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = 20  # compare this many total points
-            a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
-            a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
-            max_stdev = max(stdev_h, stdev_j)
+            vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
+            vec_len = 25  # compare this many total points
+            a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1), debug=debug)
+            a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset), debug=debug)
+            stdev = (stdev_h + stdev_j)/2
+
+            if stdev > 0.2:
+                continue
+
+            if debug:
+                print(f"a_ih: {round(a_ih * 180/math.pi)} stdev_h: {stdev_h}")
+                print(f"a_ij: {round(a_ij * 180/math.pi)} stdev_j: {stdev_j}")
+                print(util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
+                print(util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
 
             p_h = (p_i[0] + 10 * math.cos(a_ih), p_i[1] + 10 * math.sin(a_ih))
             p_j = (p_i[0] + 10 * math.cos(a_ij), p_i[1] + 10 * math.sin(a_ij))
 
-            # make sure the segments before and after are approximately flat
-            if max_stdev > 0.3:
-                continue
-
-            # and the angle from i to the centroid of the piece
-            vec_ic = util.angle_between(p_i, self.centroid)
-
             # how wide is the angle between the two legs?
-            angle_hij = util.angle_i(p_h, p_i, p_j)
+            angle_hij = util.counterclockwise_angle_between_vectors(p_h, p_i, p_j)
 
             # See if the delta between the two legs is roughly 90º
             is_roughly_90 = abs(math.pi/2 - angle_hij) < SIDES_ORTHOGONAL_THRESHOLD_DEG * math.pi/180
             if not is_roughly_90:
+                if debug:
+                    print(f"not roughly 90º: {round(angle_hij * 180/math.pi)}")
                 continue
 
             # corners generally open up toward the center of the piece
             # meaning the mid-angle that comes out of the corner is roughly the same as the angle from the corner to the center
             angle_ih = util.angle_between(p_i, p_h)
+            a_ic = util.angle_between(p_i, self.centroid)
             opens_toward_angle = util.angle_between(p_i, util.midpoint(p_h, p_j))
-            offset_from_center = util.compare_angles(opens_toward_angle, vec_ic)
-            CORNER_OPENS_TOWARD_CENTER_THRESHOLD_DEG = 85
-            is_pointed_toward_center = offset_from_center < CORNER_OPENS_TOWARD_CENTER_THRESHOLD_DEG * math.pi/180
+            offset_from_center = util.compare_angles(opens_toward_angle, a_ic)
+            is_pointed_toward_center = offset_from_center < angle_hij / 2
 
-            is_corner = is_roughly_90 # and is_pointed_toward_center or (p_i[1] == 170 and p_i[0] < 50)
+            is_corner = is_roughly_90 and is_pointed_toward_center
             if is_corner:
-                # print(f"Found possible corner at {i}: {p_i} w/ {max_stdev}")
-                # print(f"\t h={p_h} \t i={p_i} \t j={p_j} \t c={self.centroid} \t ic={round(vec_ic * 180 / math.pi)} \t ih={round(angle_ih * 180 / math.pi)}")
+                # print(f"Found possible corner at {i}: {p_i} w/ {stdev}")
+                # print(f"\t c={self.centroid} \t ih={round(angle_ih * 180 / math.pi)} \t ic={round(a_ic * 180 / math.pi)} \t ij={round(a_ij * 180 / math.pi)} \t offset={round(offset_from_center * 180 / math.pi)}")
                 # print(f"\t angle width: {round(angle_hij * 180 / math.pi)}")
                 # print(f"\t roughly 90? {is_roughly_90} \t toward center? {is_pointed_toward_center} \t open toward {round(opens_toward_angle * 180 / math.pi)} \t offset from center {round(offset_from_center * 180 / math.pi)}")
-                possible_corners.append((i, p_i, angle_hij, max_stdev, offset_from_center))
+                possible_corners.append((i, p_i, angle_hij, stdev, offset_from_center))
+            elif debug:
+                print(f"NOT a possible corner at {i}: {p_i} w/ {stdev}")
+                print(f"\t c={self.centroid} \t ih={round(angle_ih * 180 / math.pi)} \t ic={round(a_ic * 180 / math.pi)} \t ij={round(a_ij * 180 / math.pi)} \t offset={round(offset_from_center * 180 / math.pi)}")
+                print(f"\t angle width: {round(angle_hij * 180 / math.pi)}")
+                print(f"\t roughly 90? {is_roughly_90} \t toward center? {is_pointed_toward_center} \t open toward {round(opens_toward_angle * 180 / math.pi)} \t offset from center {round(offset_from_center * 180 / math.pi)}\n")
 
+        # we often find a handful of points right near the corner
+        # let's go through and pick the best of those
         eliminated_corner_indices = []
         for i, corner, angle, stdev, offset_from_center in possible_corners:
-            # print(f"Checking corner {i} @ {corner} with angle {round(angle * 180 / math.pi)}, stdev {stdev}")
+            # print(f"Checking corner {i} @ {corner} with angle {round(angle * 180 / math.pi)}, stdev {stdev}. Offset from center: {round(offset_from_center * 180 / math.pi)}, dist from centroid: {util.distance(corner, self.centroid)}")
             if i in eliminated_corner_indices:
                 # if we've been ruled out, no work to do
                 # print(f"\t oh wait, corner {i} has been eliminated")
                 continue
 
             for j, corner_j, angle, stdev_j, _ in possible_corners:
-                if i == j:
-                    continue
-
-                # if we're close to another candidate, and our stdev is smaller, we're the better corner
-                # this is because the vectors before and after us are more linear
-                if util.distance(corner, corner_j) < 10 and stdev <= stdev_j:
-                    # print(f"\t corner {i} is close to {j} and has a smaller stdev; knocking out {j}")
-                    eliminated_corner_indices.append(j)
+                # if we're close to another candidate, figure out if we're the better corner
+                if i != j and util.distance(corner, corner_j) < 10:
+                    # choose the corner thats furthest from the center of the piece, meaning it juts out the most
+                    d_centroid_i = util.distance(corner, self.centroid)
+                    d_centroid_j = util.distance(corner_j, self.centroid)
+                    if d_centroid_i >= d_centroid_j:
+                        eliminated_corner_indices.append(j)
 
         possible_corners = [c for c in possible_corners if c[0] not in eliminated_corner_indices]
 
         if len(possible_corners) < 4:
             raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
 
-        # for i, (v_i, corner, angle, stdev, offset) in enumerate(possible_corners):
-        #     print(f"Corner {i} @ {corner} has angle {round(angle * 180 / math.pi)}, stdev {stdev}, offset {round(offset * 180 / math.pi)}")
+        def _score_corner(angle, stdev, offset, angle_to_opposite_corner, closest_corners_distance):
+            # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
+            angle_error = max(0, angle - math.pi/2)
 
+            proximity_penalty = 0.1 * self.dim / max(closest_corners_distance, 1)
+
+            score = (0.5 * angle_to_opposite_corner) + angle_error + offset + (0.2 * stdev) + proximity_penalty
+            # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
+            return score
+
+        # we still often end up with more than 4 corners
+        # let's find the 4 "best" corners
         while len(possible_corners) > 4:
-            # eliminate the worst "corners"
             # we determine "worst" by a mix of:
+            # - do we have a corner on the other side of the piece? All pieces have a corner that's pretty much 180º around the centroid
             # - how far from 90º the angle is
             # - how non-straight the spokes are
-            # - how far from the center the corner opens up to
-            max_mix = 0
+            max_score = 0
             max_i = 0
-            for i, (v_i, corner, angle, stdev, offset) in enumerate(possible_corners):
-                angle_error = angle - math.pi/2  # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
-                mixing = angle_error + stdev + 2*offset
-                if mixing > max_mix:
-                    max_mix = mixing
+            for i, (v_i, v_corner, angle, stdev, offset) in enumerate(possible_corners):
+                # compare to positions of other corners
+                angle_to_opposite_corner = float("inf")
+                opposite_j = None
+                closest_dist = float("inf")
+                sec_closest_dist = float("inf")
+                for j, (_, v_corner_j, _, _, _) in enumerate(possible_corners):
+                    if v_corner != v_corner_j:
+                        opposing_corner_angle = util.counterclockwise_angle_between_vectors(v_corner, self.centroid, v_corner_j)
+                        delta_180 = util.compare_angles(opposing_corner_angle, math.pi)
+                        # print(f"Comparing {v_corner} to {v_corner_j}: open angle: {round(opposing_corner_angle * 180 / math.pi)}º, delta 180º: {round(delta_180 * 180 / math.pi)}")
+                        if delta_180 < angle_to_opposite_corner:
+                            angle_to_opposite_corner = delta_180
+                            opposite_j = j
+
+                        dist = util.distance(v_corner, v_corner_j)
+                        if dist < closest_dist:
+                            sec_closest_dist = closest_dist
+                            closest_dist = dist
+
+                score = _score_corner(angle, stdev, offset, angle_to_opposite_corner, closest_dist + sec_closest_dist)
+                if score > max_score:
+                    max_score = score
                     max_i = i
 
             popped = possible_corners.pop(max_i)
@@ -281,6 +320,19 @@ class Vector(object):
 
         self.corners = [c[1] for c in possible_corners]
         self.corner_indices = [c[0] for c in possible_corners]
+        print(self.corners)
+
+        # the four corners should be roughly 90º from each other
+        # we'll use the angle between the spokes to determine this
+        corner_angles = [util.angle_between(self.centroid, c) for c in self.corners]
+        for i in range(4):
+            j = (i + 1) % 4
+            angle = corner_angles[i]
+            angle_next = corner_angles[j]
+            angle_between = util.compare_angles(angle, angle_next)
+            delta_90 = util.compare_angles(math.pi/2, angle_between)
+            if delta_90 > 45 * math.pi/180:
+                raise Exception(f"Corner angles are not roughly 90º: {round(angle * 180 / math.pi)}º and {round(angle_next * 180 / math.pi)}º = {round(angle_between * 180 / math.pi)}º apart, on piece {self.id}")
 
     def extract_four_sides(self) -> None:
         """

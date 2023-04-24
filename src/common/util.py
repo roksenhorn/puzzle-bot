@@ -172,24 +172,34 @@ def slice(l: List, i: int, j: int) -> List:
         return l[i:] + l[:j + 1]
 
 
-def angle_i(h, i, j):
+def counterclockwise_angle_between_vectors(h, i, j):
     """
-    Calculates the angle between two vectors, i->h and i->j
+    Calculates the angle between two vectors, i->h and i->j, sweeping counter-clockwise
             j
     h
            θ <--- angle
            i
     """
-    ih = (h[0] - i[0], h[1] - i[1])
-    ij = (j[0] - i[0], j[1] - i[1])
+    # shift the vectors to be based at i
+    v1 = (h[0] - i[0], h[1] - i[1])
+    v2 = (j[0] - i[0], j[1] - i[1])
 
-    dot_product = sum(x1 * x2 for x1, x2 in zip(ih, ij))
-    v1_magnitude = math.sqrt(sum(x**2 for x in ih))
-    v2_magnitude = math.sqrt(sum(x**2 for x in ij))
+    # normalize the lengths
+    v1 = v1 / np.linalg.norm(v1)
+    v2 = v2 / np.linalg.norm(v2)
 
-    cos_angle = dot_product / (v1_magnitude * v2_magnitude)
-    angle = math.acos(cos_angle)
-    return angle
+    dot_product = np.dot(v1, v2)
+    determinant = v1[0] * v2[1] - v1[1] * v2[0]
+    angle = np.arctan2(determinant, dot_product)
+
+    # Ensure the angle is in the range [0, 2π]
+    if angle < 0:
+        angle += 2 * np.pi
+
+    # make CCW
+    angle = 2 * np.pi - angle
+
+    return float(angle)
 
 
 
@@ -399,15 +409,44 @@ def midpoint_along_path(vertices, p1, p2) -> Tuple[int, int]:
     return min_v
 
 
-def colinearity(from_point, to_points) -> Tuple[float, float]:
+def average_of_angles(angles):
+    angles = np.array(angles)
+    avg_x = np.mean(np.cos(angles))
+    avg_y = np.mean(np.sin(angles))
+
+    avg_angle = np.arctan2(avg_y, avg_x)
+    return float(avg_angle)
+
+
+def angular_stdev(angles):
+    angles = np.array(angles)
+    unit_vectors_x = np.cos(angles)
+    unit_vectors_y = np.sin(angles)
+
+    mean_x = np.mean(unit_vectors_x)
+    mean_y = np.mean(unit_vectors_y)
+    mean_angle = np.arctan2(mean_y, mean_x)
+
+    angular_deviations = np.arctan2(np.sin(angles - mean_angle), np.cos(angles - mean_angle))
+    stdev = np.std(angular_deviations)
+
+    return float(stdev)
+
+
+def colinearity(from_point, to_points, debug=False) -> Tuple[float, float]:
     """
     Given a point and a list of points, finds how "colinear" they are:
      - the average angle between the point and the points
      - the std dev of the angles
     """
     angles = [angle_between(from_point, to_point) for to_point in to_points]
-    avg = sum(angles) / len(angles)
-    std_dev = math.sqrt(sum([(angle - avg) ** 2 for angle in angles]) / len(angles))
+    avg = average_of_angles(angles)
+    std_dev = angular_stdev(angles)
+    if debug:
+        print("Colinearity:")
+        print(f"angles: {[round(a * 180/math.pi) for a in angles]}")
+        print(f"avg: {round(avg * 180/math.pi)}")
+        print(f"deltas: {[(angle - avg) ** 2 for angle in angles]} \t ==> stdev: {std_dev}")
     return avg, std_dev
 
 
