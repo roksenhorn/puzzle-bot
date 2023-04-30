@@ -1,5 +1,5 @@
 import os
-import yaml
+import json
 
 from common import sides
 
@@ -10,7 +10,7 @@ class Piece(object):
         i = 1
         done = False
         while not done:
-            path = os.path.join(directory, f"side_{i}_0.yaml")
+            path = os.path.join(directory, f"side_{i}_0.json")
             if os.path.exists(path):
                 piece = Piece.load(directory, id=i)
                 pieces[piece.id] = piece
@@ -24,9 +24,9 @@ class Piece(object):
     def load(cls, directory, id):
         sides_list = []
         for side_index in range(4):
-            path = os.path.join(directory, f"side_{id}_{side_index}.yaml")
+            path = os.path.join(directory, f"side_{id}_{side_index}.json")
             with open(path, "r") as f:
-                data = yaml.safe_load(f.read())
+                data = json.load(f)
             side = sides.Side(piece_id=id, side_id=side_index, vertices=data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'])
             sides_list.append(side)
         piece = cls(id=id, is_edge=False, sides=sides_list)

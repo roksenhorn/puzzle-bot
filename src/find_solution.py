@@ -25,8 +25,8 @@ def solve(path, serialize, id, skip_step, stop_step):
     if skip_step < 1 and stop_step > 1:
         vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
-    if skip_step < 2 and stop_step > 2 and not id:
-        find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id)
+    if skip_step < 2 and stop_step > 2:
+        find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
 
     if skip_step < 3 and stop_step > 3 and not id:
         build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
@@ -75,13 +75,12 @@ def vectorize(input_path, output_path, id, serialize):
     i = id if id is not None else 1
 
     if serialize:
-        results = []
         while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
             print(f"> Vectorizing {i}.bmp")
             path = os.path.join(input_path, f'{i}.bmp')
             vectorize = vector.Vector.from_file(filename=path, id=i)
             render = (i == id)
-            results.append(vectorize.process(output_path, render))
+            vectorize.process(output_path, render)
 
             i += 1
             if id is not None:
@@ -108,13 +107,13 @@ def vectorize(input_path, output_path, id, serialize):
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
 
 
-def find_connectivity(input_path, output_path, id):
+def find_connectivity(input_path, output_path, id, serialize):
     """
     Opens each piece data and finds how each piece could connect to others
     """
     print(f"\n{util.RED}### Building connectivity ###{util.WHITE}\n")
     start_time = time.time()
-    connect.build(input_path, output_path, id)
+    connect.build(input_path, output_path, id, serialize)
     duration = time.time() - start_time
     print(f"Building the graph took {round(duration, 2)} seconds")
 

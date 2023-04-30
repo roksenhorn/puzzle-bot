@@ -229,7 +229,7 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     """
     Returns the total integrated error between two polylines
     """
-
+    print(f"total_integrated_error {find_zero_mean_error}...")
     p1_len = polyline_length(polyline1)
     p2_len = polyline_length(polyline2)
 
@@ -260,7 +260,7 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
         error1 = error / p1_len
         return min(error1, error2), mean_error
     else:
-        return error / p1_len, None
+        return error / p1_len, (0, 0)
 
     # TODO:
     # if we find some pieces just aren't matching great still, we can try rotating ± 2 degrees and see if that helps

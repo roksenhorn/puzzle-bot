@@ -7,32 +7,38 @@ from common import pieces, sides
 
 
 SOLUTION = [
-    [(1, 0), None],
-    [(1, 1), (10, 0)],
-    [(1, 2), (4, 0)],
-    [(1, 3), (2, 1)],
-    [(5, 2), (6, 1)],
-    [(13, 0), (49, 2)],
-    [(14, 2), (47, 3)],
-    [(86, 0), (18, 0)],
+    # [(1, 0), None],
+    # [(1, 1), (10, 0)],
+    # [(1, 2), (4, 0)],
+    # [(1, 3), (2, 1)],
+    # [(5, 2), (6, 1)],
+    # [(13, 0), (49, 2)],
+    # [(14, 2), (47, 3)],
+    # [(86, 0), (18, 0)],
 ]
 
 
-def build(input_path, output_path, id=None):
+def build(input_path, output_path, id=None, serialize=False):
+    print("> Loading piece data...")
     ps = pieces.Piece.load_all(input_path)
-    if id is not None:
-        ps = {id: ps[id]}
 
-    pool = multiprocessing.Pool()
-    with multiprocessing.Pool(processes=8) as pool:
-        results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
-        out = [r.get() for r in results]
-        ps = { piece_id: piece for (piece_id, piece) in out }
+    if not serialize:
+        pool = multiprocessing.Pool()
+        with multiprocessing.Pool(processes=8) as pool:
+            results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
+            out = [r.get() for r in results]
+    else:
+        out = []
+        for piece_id in ps.keys():
+            if id is not None and piece_id != id:
+                continue
+            out.append( _find_potential_matches_for_piece(ps, piece_id, debug=(id is not None)))
 
+    ps = { piece_id: piece for (piece_id, piece) in out }
     _save(ps, output_path)
 
 
-def _find_potential_matches_for_piece(ps, piece_id):
+def _find_potential_matches_for_piece(ps, piece_id, debug=False):
     """
     Find other sides that fit with this piece's sides
     """
@@ -51,7 +57,7 @@ def _find_potential_matches_for_piece(ps, piece_id):
                     continue
 
                 part_of_solution = ([(piece_id, si), (other_piece_id, sj)] in SOLUTION) or ([(other_piece_id, sj), (piece_id, si)] in SOLUTION)
-                error = side.error_when_fit_with(other_side, render=part_of_solution, debug_str=f'{piece_id}[{si}] vs {other_piece_id}[{sj}]')
+                error = side.error_when_fit_with(other_side, render=part_of_solution or debug, debug_str=f'{piece_id}[{si}] vs {other_piece_id}[{sj}]')
                 if error <= sides.SIDE_MAX_ERROR_TO_MATCH:
                     piece.fits[si].append((other_piece.id, sj, error))
 

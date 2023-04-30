@@ -59,6 +59,7 @@ class Mosaic(object):
             print()
 
     def save(self, output_path):
+        self.pixels = [[1 if pixel == 1 else 0 for pixel in row] for row in self.pixels]
         img = PIL.Image.new('1', (self.w, self.h))
         img.putdata([pixel for row in self.pixels for pixel in row])
         img.save(output_path)
@@ -82,9 +83,9 @@ class Mosaic(object):
 
 
 SSD_SEARCH_RADIUS = 0 # 5 is a value that is fast but still accounts for some slop
-INPUT_UNITS_TO_PIXEL_RATIO = 1080
+INPUT_UNITS_TO_PIXEL_RATIO = 700
 THRESHOLD = 170
-SCALE_BY = 0.85
+SCALE_BY = 0.65
 
 
 def grow(mosaic, new_path, photo_origin):

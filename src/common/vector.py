@@ -1,7 +1,7 @@
 import math
 import os
-import yaml
-from typing import List, Tuple
+import json
+from typing import List
 
 from common import sides, util
 
@@ -37,6 +37,7 @@ class Vector(object):
         self.dim = float(self.width + self.height) / 2.0
         self.id = id
         self.sides = []
+        self.corners = []
 
     def process(self, output_path=None, render=False):
         self.find_border_raster()
@@ -76,10 +77,10 @@ class Vector(object):
             f.write(svg)
 
         for i, side in enumerate(self.sides):
-            side_path = os.path.join(output_path, f"side_{self.id}_{i}.yaml")
+            side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
             data = {'piece_id': self.id, 'side_index': i, 'vertices': [list(v) for v in side.vertices], 'piece_center': list(side.piece_center), 'is_edge': side.is_edge}
             with open(side_path, 'w') as f:
-                f.write(yaml.dump(data, default_flow_style=True))
+                f.write(json.dumps(data))
 
     def find_border_raster(self) -> None:
         self.border = [[0 for i in range(self.width)] for j in range(self.height)]
@@ -199,7 +200,7 @@ class Vector(object):
 
             # find the angle from i to the points before it (h), and i to the points after (j)
             vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = 25  # compare this many total points
+            vec_len = 10  # compare this many total points
             a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1), debug=debug)
             a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset), debug=debug)
             stdev = (stdev_h + stdev_j)/2
@@ -269,16 +270,19 @@ class Vector(object):
         possible_corners = [c for c in possible_corners if c[0] not in eliminated_corner_indices]
 
         if len(possible_corners) < 4:
+            print(eliminated_corner_indices)
             raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
 
-        def _score_corner(angle, stdev, offset, angle_to_opposite_corner, closest_corners_distance):
+        def _score_corner(angle, stdev, offset_from_center, angle_to_opposite_corner, closest_corners_distance):
             # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
             angle_error = max(0, angle - math.pi/2)
 
-            proximity_penalty = 0.1 * self.dim / max(closest_corners_distance, 1)
+            # how close to other corners are we?
+            proximity_penalty = self.dim / max(closest_corners_distance, 1)
 
-            score = (0.5 * angle_to_opposite_corner) + angle_error + offset + (0.2 * stdev) + proximity_penalty
-            # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
+            score = (0.5 * angle_to_opposite_corner) + (1.0 * angle_error) + (1.5 * offset_from_center) + \
+                    (0.2 * stdev) + (0.2 * proximity_penalty)
+            # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
             return score
 
         # we still often end up with more than 4 corners
@@ -290,7 +294,7 @@ class Vector(object):
             # - how non-straight the spokes are
             max_score = 0
             max_i = 0
-            for i, (v_i, v_corner, angle, stdev, offset) in enumerate(possible_corners):
+            for i, (v_i, v_corner, angle, stdev, offset_from_center) in enumerate(possible_corners):
                 # compare to positions of other corners
                 angle_to_opposite_corner = float("inf")
                 opposite_j = None
@@ -310,7 +314,7 @@ class Vector(object):
                             sec_closest_dist = closest_dist
                             closest_dist = dist
 
-                score = _score_corner(angle, stdev, offset, angle_to_opposite_corner, closest_dist + sec_closest_dist)
+                score = _score_corner(angle, stdev, offset_from_center, angle_to_opposite_corner, closest_dist + sec_closest_dist)
                 if score > max_score:
                     max_score = score
                     max_i = i
