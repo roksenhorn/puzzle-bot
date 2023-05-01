@@ -1,6 +1,7 @@
+import itertools
+import json
 import math
 import os
-import json
 from typing import List
 
 from common import sides, util
@@ -40,6 +41,7 @@ class Vector(object):
         self.corners = []
 
     def process(self, output_path=None, render=False):
+        print(f"> Vectorizing {self.id}")
         self.find_border_raster()
         self.vectorize()
 
@@ -271,57 +273,54 @@ class Vector(object):
             print(eliminated_corner_indices)
             raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
 
-        def _score_corner(angle, stdev, offset_from_center, angle_to_opposite_corner, closest_corners_distance):
+        # now lets figure out which are the best corners
+        # we first compute a goodness score for each individual corner
+        # then we find which set of 4 corners has the best cumulative score, where we'll weigh
+        # individual corner scores, plus how evenly spread out the 4 corners are (radially)
+        def _score_corner(corner_data):
+            # the higher, the worse the corner
+            # we determine "worst" by a mix of:
+            # - how far from 90º the join angle is
+            # - how far from the center the corner "points": the midangle of the corner typically points quite close to the center of the piece
+            # - how non-straight the spokes are
+
+            index, vertex, angle, stdev, offset_from_center = corner_data
+
             # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
             angle_error = max(0, angle - math.pi/2)
 
-            # how close to other corners are we?
-            proximity_penalty = self.dim / max(closest_corners_distance, 1)
-
-            score = (0.5 * angle_to_opposite_corner) + (1.0 * angle_error) + (1.5 * offset_from_center) + \
-                    (0.2 * stdev) + (0.2 * proximity_penalty)
+            score = (1.0 * angle_error) + (1.5 * offset_from_center) + (0.2 * stdev)
             # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
-            return score
+            return index, vertex, score
 
-        # we still often end up with more than 4 corners
-        # let's find the 4 "best" corners
-        while len(possible_corners) > 4:
-            # we determine "worst" by a mix of:
-            # - do we have a corner on the other side of the piece? All pieces have a corner that's pretty much 180º around the centroid
-            # - how far from 90º the angle is
-            # - how non-straight the spokes are
-            max_score = 0
-            max_i = 0
-            for i, (v_i, v_corner, angle, stdev, offset_from_center) in enumerate(possible_corners):
-                # compare to positions of other corners
-                angle_to_opposite_corner = float("inf")
-                opposite_j = None
-                closest_dist = float("inf")
-                sec_closest_dist = float("inf")
-                for j, (_, v_corner_j, _, _, _) in enumerate(possible_corners):
-                    if v_corner != v_corner_j:
-                        opposing_corner_angle = util.counterclockwise_angle_between_vectors(v_corner, self.centroid, v_corner_j)
-                        delta_180 = util.compare_angles(opposing_corner_angle, math.pi)
-                        # print(f"Comparing {v_corner} to {v_corner_j}: open angle: {round(opposing_corner_angle * 180 / math.pi)}º, delta 180º: {round(delta_180 * 180 / math.pi)}")
-                        if delta_180 < angle_to_opposite_corner:
-                            angle_to_opposite_corner = delta_180
-                            opposite_j = j
+        def _score_4_corners(cs):
+            score = sum([c[2] for c in cs])
+            radial_positions = sorted([util.angle_between(self.centroid, c[1]) for c in cs])
+            max_radial_gap = 0
+            min_radial_gap = 2 * math.pi
+            for i in range(4):
+                p1 = radial_positions[i]
+                p2 = radial_positions[(i + 1) % 4]
+                angle_between = util.compare_angles(p1, p2)
+                if angle_between > max_radial_gap:
+                    max_radial_gap = angle_between
+                if angle_between < min_radial_gap:
+                    min_radial_gap = angle_between
 
-                        dist = util.distance(v_corner, v_corner_j)
-                        if dist < closest_dist:
-                            sec_closest_dist = closest_dist
-                            closest_dist = dist
+            biggest_gap_penalty = max((max_radial_gap - math.pi/2), 0)
+            smallest_gap_penalty = max((math.pi/2 - min_radial_gap), 0)
+            score += biggest_gap_penalty + smallest_gap_penalty
+            return cs, score
 
-                score = _score_corner(angle, stdev, offset_from_center, angle_to_opposite_corner, closest_dist + sec_closest_dist)
-                if score > max_score:
-                    max_score = score
-                    max_i = i
+        # compute each corner's score, and only consider the n best corners
+        possible_corners = sorted([_score_corner(c) for c in possible_corners], key=lambda c: c[2])[:8]
 
-            popped = possible_corners.pop(max_i)
-            # print(f"Popped a bad corner: {popped}")
-
-        self.corners = [c[1] for c in possible_corners]
-        self.corner_indices = [c[0] for c in possible_corners]
+        # Generate all combinations of 4 corners and score them each up
+        all_combinations = list(itertools.combinations(possible_corners, 4))
+        all_scores = sorted([_score_4_corners(c) for c in all_combinations], key=lambda c: c[1])
+        best_corners = sorted(all_scores[0][0], key=lambda c: util.angle_between(self.centroid, c[1]))
+        self.corners = [c[1] for c in best_corners]
+        self.corner_indices = [c[0] for c in best_corners]
 
         # the four corners should be roughly 90º from each other
         # we'll use the angle between the spokes to determine this

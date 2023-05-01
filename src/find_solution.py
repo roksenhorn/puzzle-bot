@@ -76,7 +76,6 @@ def vectorize(input_path, output_path, id, serialize):
 
     if serialize:
         while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
-            print(f"> Vectorizing {i}.bmp")
             path = os.path.join(input_path, f'{i}.bmp')
             vectorize = vector.Vector.from_file(filename=path, id=i)
             render = (i == id)
@@ -90,7 +89,6 @@ def vectorize(input_path, output_path, id, serialize):
         with multiprocessing.Pool(processes=8) as pool:
             results = []
             while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
-                print(f"> Vectorizing {i}.bmp")
                 path = os.path.join(input_path, f'{i}.bmp')
                 vectorize = vector.Vector.from_file(filename=path, id=i)
                 render = (i == id)
