@@ -4,7 +4,7 @@ from typing import List, Tuple
 from common import util
 
 # Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 0.08
+SIDE_MAX_ERROR_TO_MATCH = 0.4
 
 
 class Side(object):
@@ -72,7 +72,6 @@ class Side(object):
         if render and debug_str:
             shifted0 = [(x - shift[0], y - shift[1]) for x, y in polyline0]
             print(f"\t ==> Error = {error}, shift: {shift}")
-            util.render_polylines([polyline0, polyline1])
             util.render_polylines([shifted0, polyline1])
 
         return error

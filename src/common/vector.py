@@ -16,7 +16,7 @@ MERGE_IF_CLOSER_THAN_PX = 1.75
 SIDE_PARALLEL_THRESHOLD_DEG = 32
 
 # Adjacent sides must be "orthogonal" within this threshold (in degrees)
-SIDES_ORTHOGONAL_THRESHOLD_DEG = 38
+SIDES_ORTHOGONAL_THRESHOLD_DEG = 42
 
 # A side must be at least this long to be considered an edge
 EDGE_WIDTH_MIN_RATIO = 0.4
@@ -194,13 +194,13 @@ class Vector(object):
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(vertices)):
             p_i = vertices[i]
-            debug =(p_i[1] == 719)
+            debug =(p_i[1] == 703)
             if debug:
                 print(f"\n\n\n!!!!!!!!!!!!!! {p_i} !!!!!!!!!!!!!!!\n\n\n")
 
             # find the angle from i to the points before it (h), and i to the points after (j)
             vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = 10  # compare this many total points
+            vec_len = 11  # compare this many total points
             a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1), debug=debug)
             a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset), debug=debug)
             stdev = (stdev_h + stdev_j)/2
@@ -252,10 +252,8 @@ class Vector(object):
         # let's go through and pick the best of those
         eliminated_corner_indices = []
         for i, corner, angle, stdev, offset_from_center in possible_corners:
-            # print(f"Checking corner {i} @ {corner} with angle {round(angle * 180 / math.pi)}, stdev {stdev}. Offset from center: {round(offset_from_center * 180 / math.pi)}, dist from centroid: {util.distance(corner, self.centroid)}")
             if i in eliminated_corner_indices:
                 # if we've been ruled out, no work to do
-                # print(f"\t oh wait, corner {i} has been eliminated")
                 continue
 
             for j, corner_j, angle, stdev_j, _ in possible_corners:
@@ -324,7 +322,6 @@ class Vector(object):
 
         self.corners = [c[1] for c in possible_corners]
         self.corner_indices = [c[0] for c in possible_corners]
-        print(self.corners)
 
         # the four corners should be roughly 90º from each other
         # we'll use the angle between the spokes to determine this

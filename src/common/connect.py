@@ -77,6 +77,9 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
 
+        # only keep the 5 best matches
+        piece.fits[si] = piece.fits[si][:5]
+
     return (piece_id, piece)
 
 

@@ -229,11 +229,10 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     """
     Returns the total integrated error between two polylines
     """
-    print(f"total_integrated_error {find_zero_mean_error}...")
     p1_len = polyline_length(polyline1)
     p2_len = polyline_length(polyline2)
 
-    NUM_STOPS = 15
+    NUM_STOPS = 25
     error = 0
     errors = []
     at_dist = 0
@@ -246,11 +245,11 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
         p_error = (p1_at_t[0] - p[0], p1_at_t[1] - p[1])
         errors.append(p_error)
 
-        if error / p1_len >= 0.25:
+        if error / p1_len >= 1.5:
             # optimization - dip out early if we're already too erroneous
             break
 
-    if find_zero_mean_error and error / p1_len < 0.25:
+    if find_zero_mean_error and error / p1_len < 1.5:
         # we often have alignment errors
         # find the mean error, and shift and recompute by that amount
         X_SHIFT_MULT = 2.5  # much of the time, we'll have zero x error because the side is horizontal, but about 1/3 of the side will be vertical, so weight that portion higher
