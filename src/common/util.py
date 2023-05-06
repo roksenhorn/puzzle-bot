@@ -225,35 +225,70 @@ def mirrored(vertices) -> List[Tuple[int, int]]:
     return mirrored
 
 
+def chunk_polyline(polyline, num_chunks, t_width):
+    """
+    Given a polyline, a resulting number of sub-polyline chunks, and a width of the chunks,
+    returns a dict mapping t to a polyline
+    """
+    chunk_length = max(4, math.ceil(len(polyline) * t_width))
+    result = {}
+    for tt in range(num_chunks):
+        t = tt / (num_chunks - 1)
+        mid_index = round(t * len(polyline))
+        start_index = max(0, math.floor(mid_index - chunk_length / 2))
+        end_index = min(len(polyline), math.ceil(mid_index + chunk_length / 2))
+        if start_index == 0:
+            end_index = chunk_length
+        elif end_index == len(polyline):
+            start_index = len(polyline) - chunk_length
+        result[t] = polyline[start_index:end_index]
+    return result
+
+
 def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     """
     Returns the total integrated error between two polylines
     """
     p1_len = polyline_length(polyline1)
-    p2_len = polyline_length(polyline2)
 
-    NUM_STOPS = 25
+    NUM_STOPS = 26
     error = 0
     errors = []
     at_dist = 0
     i = 0
-    for tt in range(NUM_STOPS + 1):
-        t = tt / NUM_STOPS
+
+    p2_chunks = chunk_polyline(polyline2, NUM_STOPS, t_width=0.1)
+
+    for tt in range(NUM_STOPS):
+        t = tt / (NUM_STOPS - 1)
+
+        # find the point on polyline1 at t
         p1_at_t, i, at_dist = _point_at_t_along_polyline(polyline1, p1_len, t, i, at_dist)
-        e_t, p = _distance_to_polyline(p1_at_t, polyline2)
-        error += e_t
-        p_error = (p1_at_t[0] - p[0], p1_at_t[1] - p[1])
+
+        # then find the sub-polyline of polyline2 around this t area
+        relevant_p2_segments = p2_chunks[t]
+        if len(relevant_p2_segments) < 2:
+            print(f"ERROR: no relevant segments for t={t}, p2 segments={len(polyline2)}")
+            for t, segments in p2_chunks.items():
+                print(f"t={t}: {segments}")
+
+        # then find the closest point on that sub-polyline to p1_at_t
+        # we do this because we need to tolerate slight differences in lengths of the two polylines otherwise small imperfections early on acrue error along the whole polyline
+        e_t, p = _distance_to_polyline(p1_at_t, relevant_p2_segments)
+        error += e_t**1.5  # we want to weight the error more heavily when it's larger
+        p_error = (p1_at_t[0] - p[0], p1_at_t[1] - p[1])  # x and y components of the error
         errors.append(p_error)
 
-        if error / p1_len >= 1.5:
-            # optimization - dip out early if we're already too erroneous
-            break
-
-    if find_zero_mean_error and error / p1_len < 1.5:
+    if find_zero_mean_error:
         # we often have alignment errors
         # find the mean error, and shift and recompute by that amount
-        X_SHIFT_MULT = 2.5  # much of the time, we'll have zero x error because the side is horizontal, but about 1/3 of the side will be vertical, so weight that portion higher
+        X_SHIFT_MULT = 3.5  # much of the time, we'll have zero x error because the side is horizontal, but about 1/3 of the side will be vertical, so weight that portion higher
         mean_error = (sum([X_SHIFT_MULT * e[0] for e in errors]) / len(errors), sum([e[1] for e in errors]) / len(errors))
+
+        # clamp the components of the mean error to be within [-2, 2]
+        # if we allow too much shifting, we align the nub of the piece even if the corners don't line up at all
+        mean_error = (min(2, max(-2, mean_error[0])), min(2, max(-2, mean_error[1])))
+
         polyline1_shifted = [(x - mean_error[0], y - mean_error[1]) for (x, y) in polyline1]
         error2, _ = total_integrated_error(polyline1_shifted, polyline2, find_zero_mean_error=False)
         error1 = error / p1_len

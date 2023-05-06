@@ -32,7 +32,7 @@ def build(input_path, output_path, id=None, serialize=False):
         for piece_id in ps.keys():
             if id is not None and piece_id != id:
                 continue
-            out.append( _find_potential_matches_for_piece(ps, piece_id, debug=(id is not None)))
+            out.append(_find_potential_matches_for_piece(ps, piece_id, debug=(id is not None)))
 
     ps = { piece_id: piece for (piece_id, piece) in out }
     _save(ps, output_path)
