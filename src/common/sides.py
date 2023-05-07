@@ -4,7 +4,7 @@ from typing import List, Tuple
 from common import util
 
 # Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 0.9
+SIDE_MAX_ERROR_TO_MATCH = 1.5
 
 
 class Side(object):

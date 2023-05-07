@@ -85,13 +85,13 @@ class Board(object):
 
     def can_place(self, piece_id, fits, x, y, orientation):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
-            return False #, f"Cannot place {piece_id} at ({x}, {y}) because it is outside the board"
+            return False, f"Cannot place {piece_id} at ({x}, {y}) because it is outside the board"
 
         if piece_id in self._placed_piece_ids:
-            return False #, f"Cannot place {piece_id} at ({x}, {y}) because it has already been placed"
+            return False, f"Cannot place {piece_id} at ({x}, {y}) because it has already been placed"
 
         if self._board[y][x] is not None:
-            return False #, f"Cannot place {piece_id} at ({x}, {y}) because it is already occupied by {self._board[y][x][0]}"
+            return False, f"Cannot place {piece_id} at ({x}, {y}) because it is already occupied by {self._board[y][x][0]}"
 
         sides_that_must_be_edges = self._sides_that_must_be_edges(x, y)
         # print(f"\t\tPlacing {piece_id} @ ori {orientation} @ ({x}, {y}) requires sides {sides_that_must_be_edges} to be edges")
@@ -102,9 +102,9 @@ class Board(object):
             # print(f"\t\t    checking side {side_i}, which rotates to fits[{rotated_i}]")
             is_edge = len(fits_i) == 0
             if not is_edge and expect_edge:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because side @ index {rotated_i} is not an edge piece"
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because side @ index {rotated_i} is not an edge piece"
             elif is_edge and not expect_edge:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because side @ index {rotated_i} is an edge but it shouldn't be"
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because side @ index {rotated_i} is an edge but it shouldn't be"
 
         # check connectivity of neighbors
         # if we have someone in a space next to us, let's make sure we connect properly to that space
@@ -114,29 +114,29 @@ class Board(object):
             rotated_i = (LEFT - orientation) % 4
             fits_i = [f[0] for f in fits[rotated_i]]
             if neighbor_piece_id not in fits_i:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
         if x < self.width - 1 and self._board[y][x + 1] is not None:
             # check right neighbor has a fit
             neighbor_piece_id, _, _ = self._board[y][x + 1]
             rotated_i = (RIGHT - orientation) % 4
             fits_i = [f[0] for f in fits[rotated_i]]
             if neighbor_piece_id not in fits_i:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
         if y > 0 and self._board[y - 1][x] is not None:
             # check top neighbor has a fit
             neighbor_piece_id, _, _ = self._board[y - 1][x]
             rotated_i = (TOP - orientation) % 4
             fits_i = [f[0] for f in fits[rotated_i]]
             if neighbor_piece_id not in fits_i:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
         if y < self.height - 1 and self._board[y + 1][x] is not None:
             # check bottom neighbor has a fit
             neighbor_piece_id, _, _ = self._board[y + 1][x]
             rotated_i = (BOTTOM - orientation) % 4
             fits_i = [f[0] for f in fits[rotated_i]]
             if neighbor_piece_id not in fits_i:
-                return False #, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
-        return True #, None
+                return False, f"Cannot place {piece_id} at ({x}, {y}) because it does not connect to the right neighbor {neighbor_piece_id} (only connects to {fits_i})"
+        return True, None
 
     def place(self, piece_id, fits, x, y, orientation):
         self._board[y][x] = (piece_id, fits, orientation)
@@ -183,6 +183,9 @@ def build(input_path, output_path):
             corners.append(piece_id)
 
     print(f"Corners: {corners}")
+    if len(corners) != 4:
+        raise Exception(f"Expected 4 corners, got {len(corners)}")
+
     start_piece_id = corners[0]
     start_piece_fits = ps[start_piece_id]
     start_orientation = _orient_start_corner_to_top_left(start_piece_fits)
@@ -215,10 +218,9 @@ def build(input_path, output_path):
         # print(f'Checking neighbors of {start_piece_id}[{index_of_neighbor_in_direction}] @ ori {start_orientation} --> checking: {ps[start_piece_id][index_of_neighbor_in_direction]}\n================')
 
         for neighbor_piece_id, neighbor_side_index in ps[start_piece_id][index_of_neighbor_in_direction]:
-            neighbor_orientation = (OPPOSITE[direction] - neighbor_side_index) % 4 # (start_orientation + neighbor_side_index) % 4
+            neighbor_orientation = (OPPOSITE[direction] - neighbor_side_index) % 4
             # print(f'\t {neighbor_piece_id}[{neighbor_side_index}] @ ori {neighbor_orientation}')
-            ok = board.can_place(piece_id=neighbor_piece_id, fits=ps[neighbor_piece_id], x=x, y=y, orientation=neighbor_orientation)
-
+            ok, err = board.can_place(piece_id=neighbor_piece_id, fits=ps[neighbor_piece_id], x=x, y=y, orientation=neighbor_orientation)
             if ok:
                 # print(">>> OK! \t Adding to stack")
                 next_board = Board.copy(board)

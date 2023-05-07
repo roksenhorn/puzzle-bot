@@ -257,7 +257,7 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     at_dist = 0
     i = 0
 
-    p2_chunks = chunk_polyline(polyline2, NUM_STOPS, t_width=0.1)
+    p2_chunks = chunk_polyline(polyline2, NUM_STOPS, t_width=0.2)
 
     for tt in range(NUM_STOPS):
         t = tt / (NUM_STOPS - 1)
@@ -484,6 +484,21 @@ def colinearity(from_point, to_points, debug=False) -> Tuple[float, float]:
     return avg, std_dev
 
 
+def sublist_exists(lst, sub_lst):
+    """
+    Returns true if sub_lst is a sublist of lst
+    Allows for wrapping around the end of the list
+    """
+    if len(sub_lst) > len(lst):
+        return False
+
+    lst_extended = lst * 2
+    sub_lst_str = ''.join(map(str, sub_lst))
+    lst_extended_str = ''.join(map(str, lst_extended))
+
+    return sub_lst_str in lst_extended_str
+
+
 def find_islands(grid):
     visited = set()
     islands = []
@@ -579,7 +594,6 @@ def render_polylines(vertices_list: List[List[Tuple[int, int]]], bounds=None) ->
     maxy = min(maxy, b_maxy)
 
     for i, vertices in enumerate(vertices_list):
-        vertices = vertices[:-2]
         for j, v in enumerate(vertices):
             color = colors[i % len(colors)]
             current_value = grid[v[1] - miny][v[0] - minx]
@@ -589,7 +603,7 @@ def render_polylines(vertices_list: List[List[Tuple[int, int]]], bounds=None) ->
                 grid[v[1] - miny][v[0] - minx] = f'{BLACK_ON_WHITE}#{WHITE}'
 
     print(GRAY + '   ' + ' v' * (maxx - minx + 1) + WHITE + '\n')
-    for row in grid:
+    for i, row in enumerate(grid):
         s = ' '.join(row)
-        print(f'{GRAY}>   {WHITE}' + s + f'{GRAY}   <{WHITE}')
+        print(f'{GRAY}>   {WHITE}' + s + f'{GRAY}   < {i}{WHITE}')
     print('\n   ' + GRAY + ' ^' * (maxx - minx + 1) + WHITE + '\n')

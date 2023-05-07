@@ -110,18 +110,33 @@ def _remove_stragglers(pixels, width, height) -> bool:
                 continue
 
             # All 8 neighbors
+            above_left = pixels[y - 1][x - 1]
+            above = pixels[y - 1][x]
+            above_right = pixels[y - 1][x + 1]
+            right = pixels[y][x + 1]
+            below_right = pixels[y + 1][x + 1]
+            below = pixels[y + 1][x]
+            below_left = pixels[y + 1][x - 1]
+            left = pixels[y][x - 1]
             neighbors = [
-                pixels[y - 1][x - 1],  # above left
-                pixels[y - 1][x],      # above
-                pixels[y - 1][x + 1],  # above right
-                pixels[y][x + 1],      # right
-                pixels[y + 1][x + 1],  # below right
-                pixels[y + 1][x],      # below
-                pixels[y + 1][x - 1],  # below left
-                pixels[y][x - 1],      # left
+                above_left,
+                above,
+                above_right,
+                right,
+                below_right,
+                below,
+                below_left,
+                left,
             ]
             borders = [True for n in neighbors if n == 1]
             if len(borders) <= 1:
+                # straggler only connected by one
+                pixels[y][x] = 0
+                removed = True
+
+            # if there are only 2 neighbors, and they are not adjacent (e.g. no [1, 1] subset in the list), then these
+            # are one-pixel-wide bridges that should be removed
+            if len(borders) == 2 and not util.sublist_exists(borders, [1, 1]):
                 pixels[y][x] = 0
                 removed = True
 

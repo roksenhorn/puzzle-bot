@@ -359,8 +359,9 @@ class Vector(object):
                 vertices.append(self.corners[j])
 
             # edges are flat and thus have very little variance from the average line between all points
-            _, stdev = util.colinearity(from_point=vertices[0], to_points=vertices[1:])
-            is_edge = stdev < 0.06
+            corner_corner_distance = util.distance(vertices[0], vertices[-1])
+            polyline_length = util.polyline_length(vertices)
+            is_edge = polyline_length / corner_corner_distance < 1.1
 
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)

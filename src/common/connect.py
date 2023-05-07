@@ -22,7 +22,7 @@ def build(input_path, output_path, id=None, serialize=False):
     print("> Loading piece data...")
     ps = pieces.Piece.load_all(input_path)
 
-    if not serialize:
+    if not serialize and id is None:
         pool = multiprocessing.Pool()
         with multiprocessing.Pool(processes=8) as pool:
             results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
@@ -77,8 +77,8 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
 
-        # only keep the 5 best matches
-        piece.fits[si] = piece.fits[si][:5]
+        # only keep the best matches
+        piece.fits[si] = piece.fits[si][:50]
 
     return (piece_id, piece)
 
