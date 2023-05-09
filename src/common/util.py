@@ -2,9 +2,7 @@ import math
 from PIL import Image
 from typing import List, Tuple
 from shapely.geometry import Polygon, Point, LineString
-from scipy.spatial.distance import directed_hausdorff
 import numpy as np
-from scipy.spatial import KDTree
 
 
 YELLOW = '\033[33m'
@@ -245,6 +243,26 @@ def chunk_polyline(polyline, num_chunks, t_width):
     return result
 
 
+def resample_polyline(polyline, n):
+    """
+    Given a polyline and a number of points to resample to,
+    returns a resampled polyline with n segments, each of equal length
+    """
+    line = LineString(polyline)
+    total_length = line.length
+    segment_length = total_length / n
+
+    resampled_points = []
+    current_length = 0
+
+    for i in range(n + 1):
+        point = line.interpolate(current_length)
+        resampled_points.append((point.x, point.y))
+        current_length += segment_length
+
+    return resampled_points
+
+
 def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     """
     Returns the total integrated error between two polylines
@@ -257,7 +275,7 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
     at_dist = 0
     i = 0
 
-    p2_chunks = chunk_polyline(polyline2, NUM_STOPS, t_width=0.2)
+    p2_chunks = resample_polyline(polyline2, NUM_STOPS - 1)
 
     for tt in range(NUM_STOPS):
         t = tt / (NUM_STOPS - 1)
@@ -266,17 +284,13 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
         p1_at_t, i, at_dist = _point_at_t_along_polyline(polyline1, p1_len, t, i, at_dist)
 
         # then find the sub-polyline of polyline2 around this t area
-        relevant_p2_segments = p2_chunks[t]
-        if len(relevant_p2_segments) < 2:
-            print(f"ERROR: no relevant segments for t={t}, p2 segments={len(polyline2)}")
-            for t, segments in p2_chunks.items():
-                print(f"t={t}: {segments}")
+        p2_at_t = p2_chunks[tt]
 
         # then find the closest point on that sub-polyline to p1_at_t
         # we do this because we need to tolerate slight differences in lengths of the two polylines otherwise small imperfections early on acrue error along the whole polyline
-        e_t, p = _distance_to_polyline(p1_at_t, relevant_p2_segments)
+        e_t = distance(p1_at_t, p2_at_t)
         error += e_t**1.5  # we want to weight the error more heavily when it's larger
-        p_error = (p1_at_t[0] - p[0], p1_at_t[1] - p[1])  # x and y components of the error
+        p_error = (p1_at_t[0] - p2_at_t[0], p1_at_t[1] - p2_at_t[1])  # x and y components of the error
         errors.append(p_error)
 
     if find_zero_mean_error:
@@ -287,7 +301,8 @@ def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
 
         # clamp the components of the mean error to be within [-2, 2]
         # if we allow too much shifting, we align the nub of the piece even if the corners don't line up at all
-        mean_error = (min(2, max(-2, mean_error[0])), min(2, max(-2, mean_error[1])))
+        MAX_SHIFT = 5
+        mean_error = (min(MAX_SHIFT, max(-MAX_SHIFT, mean_error[0])), min(MAX_SHIFT, max(-MAX_SHIFT, mean_error[1])))
 
         polyline1_shifted = [(x - mean_error[0], y - mean_error[1]) for (x, y) in polyline1]
         error2, _ = total_integrated_error(polyline1_shifted, polyline2, find_zero_mean_error=False)
