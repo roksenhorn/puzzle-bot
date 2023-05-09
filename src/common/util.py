@@ -223,26 +223,6 @@ def mirrored(vertices) -> List[Tuple[int, int]]:
     return mirrored
 
 
-def chunk_polyline(polyline, num_chunks, t_width):
-    """
-    Given a polyline, a resulting number of sub-polyline chunks, and a width of the chunks,
-    returns a dict mapping t to a polyline
-    """
-    chunk_length = max(4, math.ceil(len(polyline) * t_width))
-    result = {}
-    for tt in range(num_chunks):
-        t = tt / (num_chunks - 1)
-        mid_index = round(t * len(polyline))
-        start_index = max(0, math.floor(mid_index - chunk_length / 2))
-        end_index = min(len(polyline), math.ceil(mid_index + chunk_length / 2))
-        if start_index == 0:
-            end_index = chunk_length
-        elif end_index == len(polyline):
-            start_index = len(polyline) - chunk_length
-        result[t] = polyline[start_index:end_index]
-    return result
-
-
 def resample_polyline(polyline, n):
     """
     Given a polyline and a number of points to resample to,
@@ -263,56 +243,42 @@ def resample_polyline(polyline, n):
     return resampled_points
 
 
-def total_integrated_error(polyline1, polyline2, find_zero_mean_error=True):
+def error_between_polylines(polyline1, polyline2):
     """
     Returns the total integrated error between two polylines
     """
-    p1_len = polyline_length(polyline1)
-
     NUM_STOPS = 26
-    error = 0
-    errors = []
-    at_dist = 0
-    i = 0
 
-    p2_chunks = resample_polyline(polyline2, NUM_STOPS - 1)
+    def _error_between_polylines(p1, p2):
+        error = 0
+        error_x = 0
+        error_y = 0
 
-    for tt in range(NUM_STOPS):
-        t = tt / (NUM_STOPS - 1)
+        for t in range(NUM_STOPS):
+            # we'll compare how far apart these two points are
+            p1_at_t = p1[t]
+            p2_at_t = p2[t]
 
-        # find the point on polyline1 at t
-        p1_at_t, i, at_dist = _point_at_t_along_polyline(polyline1, p1_len, t, i, at_dist)
+            e_t = distance(p1_at_t, p2_at_t)
+            error += e_t**1.5  # we want to weight the error more heavily when it's larger
+            error_x += p1_at_t[0] - p2_at_t[0]
+            error_y += p1_at_t[1] - p2_at_t[1]
+        error_x /= NUM_STOPS
+        error_y /= NUM_STOPS
+        return error, error_x, error_y
 
-        # then find the sub-polyline of polyline2 around this t area
-        p2_at_t = p2_chunks[tt]
+    # sample along the polylines at fixed intervals
+    polyline1 = resample_polyline(polyline1, NUM_STOPS - 1)
+    polyline2 = resample_polyline(polyline2, NUM_STOPS - 1)
+    error, error_x, error_y = _error_between_polylines(polyline1, polyline2)
 
-        # then find the closest point on that sub-polyline to p1_at_t
-        # we do this because we need to tolerate slight differences in lengths of the two polylines otherwise small imperfections early on acrue error along the whole polyline
-        e_t = distance(p1_at_t, p2_at_t)
-        error += e_t**1.5  # we want to weight the error more heavily when it's larger
-        p_error = (p1_at_t[0] - p2_at_t[0], p1_at_t[1] - p2_at_t[1])  # x and y components of the error
-        errors.append(p_error)
+    # we often have slight alignment errors because of differences in corner shape
+    # find the mean error, and shift by that amount, then recompute
+    polyline1_shifted = [(x - error_x, y - error_y) for (x, y) in polyline1]
+    error_shifted, _, _ = _error_between_polylines(polyline1_shifted, polyline2)
 
-    if find_zero_mean_error:
-        # we often have alignment errors
-        # find the mean error, and shift and recompute by that amount
-        X_SHIFT_MULT = 3.5  # much of the time, we'll have zero x error because the side is horizontal, but about 1/3 of the side will be vertical, so weight that portion higher
-        mean_error = (sum([X_SHIFT_MULT * e[0] for e in errors]) / len(errors), sum([e[1] for e in errors]) / len(errors))
-
-        # clamp the components of the mean error to be within [-2, 2]
-        # if we allow too much shifting, we align the nub of the piece even if the corners don't line up at all
-        MAX_SHIFT = 5
-        mean_error = (min(MAX_SHIFT, max(-MAX_SHIFT, mean_error[0])), min(MAX_SHIFT, max(-MAX_SHIFT, mean_error[1])))
-
-        polyline1_shifted = [(x - mean_error[0], y - mean_error[1]) for (x, y) in polyline1]
-        error2, _ = total_integrated_error(polyline1_shifted, polyline2, find_zero_mean_error=False)
-        error1 = error / p1_len
-        return min(error1, error2), mean_error
-    else:
-        return error / p1_len, (0, 0)
-
-    # TODO:
-    # if we find some pieces just aren't matching great still, we can try rotating ± 2 degrees and see if that helps
+    p1_len = polyline_length(polyline1)
+    return min(error, error_shifted) / p1_len, (error_x, error_y)
 
 
 def _distance_to_polyline(point, polyline):

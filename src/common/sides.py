@@ -4,7 +4,7 @@ from typing import List, Tuple
 from common import util
 
 # Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 1.0
+SIDE_MAX_ERROR_TO_MATCH = 0.6
 
 
 class Side(object):
@@ -64,7 +64,7 @@ class Side(object):
             polyline1 = side.rotated()
 
         try:
-            error, shift = util.total_integrated_error(polyline0, polyline1)
+            error, shift = util.error_between_polylines(polyline0, polyline1)
         except Exception as e:
             print(side.rotated(math.pi)[::-1])
             raise e
