@@ -187,7 +187,6 @@ class Vector(object):
                 i += 1
 
     def find_four_corners(self):
-        # let's further simplify the shape, because this will lengthen the gap between vertices on flat parts
         vertices = self.vertices
 
         possible_corners = []
@@ -196,7 +195,7 @@ class Vector(object):
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(vertices)):
             p_i = vertices[i]
-            debug =(p_i[1] == 703)
+            debug =(p_i[1] == 1047)
             if debug:
                 print(f"\n\n\n!!!!!!!!!!!!!! {p_i} !!!!!!!!!!!!!!!\n\n\n")
 
@@ -289,15 +288,22 @@ class Vector(object):
             # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
             angle_error = max(0, angle - math.pi/2)
 
-            score = (1.0 * angle_error) + (1.6 * offset_from_center) + (0.2 * stdev)
+            score = (1.0 * angle_error) + (1.5 * offset_from_center) + (0.3 * stdev)
             # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
             return index, vertex, score
 
         def _score_4_corners(cs):
+            """
+            Given a set of 4 candidate corners, we produce a unitless score for how good they are
+            Lower is better
+            """
+            # first, start with the score of each individual corner (how close ot 90º it is, etc)
             score = sum([c[2] for c in cs])
+
             radial_positions = sorted([util.angle_between(self.centroid, c[1]) for c in cs])
             max_radial_gap = 0
             min_radial_gap = 2 * math.pi
+            side_lens = []
             for i in range(4):
                 p1 = radial_positions[i]
                 p2 = radial_positions[(i + 1) % 4]
@@ -307,9 +313,20 @@ class Vector(object):
                 if angle_between < min_radial_gap:
                     min_radial_gap = angle_between
 
+                side_len = util.distance(cs[i][1], cs[(i + 1) % 4][1])
+                side_lens.append(side_len)
+
+            # we want them to be roughly evenly spaced radially around the piece
             biggest_gap_penalty = max((max_radial_gap - math.pi/2), 0)
             smallest_gap_penalty = max((math.pi/2 - min_radial_gap), 0)
             score += biggest_gap_penalty + smallest_gap_penalty
+
+            # we also want them to form a rectangle, where opposing sides are roughly the same length (not polyline length, but straight line length)
+            len_ratio_s0_s2 = abs(1.0 - side_lens[0] / side_lens[2])
+            len_ratio_s1_s3 = abs(1.0 - side_lens[1] / side_lens[3])
+            len_ratio_penalty = 0.5 * (len_ratio_s0_s2 + len_ratio_s1_s3)
+            score += len_ratio_penalty
+
             return cs, score
 
         # compute each corner's score, and only consider the n best corners

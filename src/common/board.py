@@ -35,9 +35,9 @@ class Orientation(object):
     ZERO_POINTS_LEFT = 3
 
 # dimensions for the puzzle you're solving
-# ...I know...
-WIDTH = 10
-HEIGHT = 10
+# ...I know... :(
+WIDTH = 40
+HEIGHT = 25
 
 
 class Board(object):
@@ -203,11 +203,11 @@ def build(input_path, output_path):
     while stack:
         board, start_piece_id, start_orientation, x, y, direction = stack.pop()
         # print(f"({x}, {y}) moving {direction}")
-        if iteration % 1000 == 0:
+        if iteration % 5000 == 0:
             print(f"Iteration {iteration}, longest: {longest}")
             print(board)
 
-        if board.placed_count == 100:
+        if board.placed_count == WIDTH * HEIGHT:
             print(f"Placed 100 pieces in {iteration} iterations")
             break
         elif board.placed_count > longest:
