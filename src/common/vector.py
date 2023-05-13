@@ -202,7 +202,7 @@ class Vector(object):
 
             # find the angle from i to the points before it (h), and i to the points after (j)
             vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = 11  # compare this many total points
+            vec_len = 12  # compare this many total points
             a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1), debug=debug)
             a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset), debug=debug)
             stdev = (stdev_h + stdev_j)/2
@@ -289,7 +289,7 @@ class Vector(object):
             # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
             angle_error = max(0, angle - math.pi/2)
 
-            score = (1.0 * angle_error) + (1.5 * offset_from_center) + (0.2 * stdev)
+            score = (1.0 * angle_error) + (1.6 * offset_from_center) + (0.2 * stdev)
             # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
             return index, vertex, score
 

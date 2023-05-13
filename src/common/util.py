@@ -265,6 +265,9 @@ def error_between_polylines(polyline1, polyline2, p1_len):
     # sample along the polylines at fixed intervals
     error, error_x, error_y = _error_between_polylines(polyline1, polyline2)
 
+    # only allow a little bit of y shifting, up to +/- 5 pixels
+    error_y = max(-5, min(5, error_y))
+
     # we often have slight alignment errors because of differences in corner shape
     # find the mean error, and shift by that amount, then recompute
     polyline1_shifted = [(x - error_x, y - error_y) for (x, y) in polyline1]

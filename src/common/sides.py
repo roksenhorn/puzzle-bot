@@ -5,7 +5,7 @@ from common import util
 
 
 # Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 5.75
+SIDE_MAX_ERROR_TO_MATCH = 2.75
 
 # sides must be within this multiple of each other's polyline length
 SIDE_MAX_LENGTH_DISCREPANCY = 0.06
@@ -18,24 +18,23 @@ class Side(object):
     def __init__(self, piece_id, side_id, vertices, piece_center, is_edge, resample=False) -> None:
         self.piece_id = piece_id
         self.side_id = side_id
+        self.piece_center = piece_center
+        self.is_edge = is_edge
 
         self.vertices = vertices
         self.p1 = vertices[0]
         self.p2 = vertices[-1]
-        self.piece_center = piece_center
-        self.is_edge = is_edge
 
         if resample:
-            self.vertices, self.v_length = util.resample_polyline(self.vertices, n=SIDE_RESAMPLE_VERTEX_COUNT)
-            self.vertices = self.rotated()  # aligned to be horizontal
-            self.vertices_flipped = self.rotated(math.pi)[::-1] # aligned to be horizontal but rotated and mirrored to be the negative space of the side
+            vertices, self.v_length = util.resample_polyline(vertices, n=SIDE_RESAMPLE_VERTEX_COUNT)
+            angle = self.angle
+            self.vertices = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=0)  # aligned to be horizontal
+            self.vertices_flipped = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=math.pi)[::-1] # aligned to be horizontal but rotated and mirrored to be the negative space of the side
+            self.p1 = self.vertices[0]
+            self.p2 = self.vertices[-1]
 
     def __repr__(self) -> str:
         return f"Side({self.p1}->{self.p2} @ {int(self.angle * 180/math.pi)} deg, len={self.length}, n_vertices={len((self.vertices))}, is_edge={self.is_edge})"
-
-    def recompute_endpoints(self):
-        self.p1 = self.vertices[0]
-        self.p2 = self.vertices[-1]
 
     @property
     def angle(self) -> float:
@@ -75,11 +74,7 @@ class Side(object):
         else:  # comparing two sides to see if they belong to the same piece
             polyline2 = side.vertices
 
-        try:
-            error, shift = util.error_between_polylines(polyline1, polyline2, p1_len=side.v_length)
-        except Exception as e:
-            print(side.rotated(math.pi)[::-1])
-            raise e
+        error, shift = util.error_between_polylines(polyline1, polyline2, p1_len=side.v_length)
 
         if render and debug_str:
             shifted0 = [(x - shift[0], y - shift[1]) for x, y in polyline1]
@@ -89,17 +84,19 @@ class Side(object):
 
         return error
 
-    def rotated(self, desired_angle=0) -> List[Tuple[int, int]]:
+    @staticmethod
+    def rotated(vertices, from_angle, desired_angle) -> List[Tuple[int, int]]:
         """
         Returns a list of vertices that have been geometrically rotated such that the side is at the desired angle, with p1 as the origin
         """
+        o = vertices[0]
 
         # translate to origin
         translated = []
-        for i, (x, y) in enumerate(self.vertices):
-            translated.append((x - self.p1[0], y - self.p1[1]))
+        for i, (x, y) in enumerate(vertices):
+            translated.append((x - o[0], y - o[1]))
 
-        angle_diff = desired_angle - self.angle
+        angle_diff = desired_angle - from_angle
         rotated = []
 
         # rotate around the origin
