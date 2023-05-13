@@ -229,59 +229,50 @@ def resample_polyline(polyline, n):
     returns a resampled polyline with n segments, each of equal length
     """
     line = LineString(polyline)
-    total_length = line.length
-    segment_length = total_length / n
+    line_length = line.length
 
-    resampled_points = []
-    current_length = 0
-
-    for i in range(n + 1):
-        point = line.interpolate(current_length)
-        resampled_points.append((point.x, point.y))
-        current_length += segment_length
-
-    return resampled_points
+    # Create n evenly spaced points along the line
+    # and a list of Points at those distances
+    distances = np.linspace(0, line_length, n + 1)
+    points = [line.interpolate(distance) for distance in distances]
+    return [(float(point.x), float(point.y)) for point in points], line_length
 
 
-def error_between_polylines(polyline1, polyline2):
+def error_between_polylines(polyline1, polyline2, p1_len):
     """
     Returns the total integrated error between two polylines
     """
-    NUM_STOPS = 26
-
     def _error_between_polylines(p1, p2):
         error = 0
         error_x = 0
         error_y = 0
 
-        for t in range(NUM_STOPS):
+        for t in range(len(p1)):
             # we'll compare how far apart these two points are
             p1_at_t = p1[t]
             p2_at_t = p2[t]
 
-            e_t = distance(p1_at_t, p2_at_t)
-            error += e_t**1.5  # we want to weight the error more heavily when it's larger
-            error_x += p1_at_t[0] - p2_at_t[0]
-            error_y += p1_at_t[1] - p2_at_t[1]
-        error_x /= NUM_STOPS
-        error_y /= NUM_STOPS
+            # error-squared, because we want to weight larger errors more heavily
+            x_err = p1_at_t[0] - p2_at_t[0]
+            y_err = p1_at_t[1] - p2_at_t[1]
+            error += abs(x_err) + abs(y_err)
+            error_x += x_err
+            error_y += y_err
+        error_x /= len(p1)
+        error_y /= len(p1)
         return error, error_x, error_y
 
     # sample along the polylines at fixed intervals
-    polyline1 = resample_polyline(polyline1, NUM_STOPS - 1)
-    polyline2 = resample_polyline(polyline2, NUM_STOPS - 1)
     error, error_x, error_y = _error_between_polylines(polyline1, polyline2)
 
     # we often have slight alignment errors because of differences in corner shape
     # find the mean error, and shift by that amount, then recompute
     polyline1_shifted = [(x - error_x, y - error_y) for (x, y) in polyline1]
     error_shifted, _, _ = _error_between_polylines(polyline1_shifted, polyline2)
-
-    p1_len = polyline_length(polyline1)
     return min(error, error_shifted) / p1_len, (error_x, error_y)
 
 
-def _distance_to_polyline(point, polyline):
+def distance_to_polyline(point, polyline):
     """
     Returns the distance from a point to a polyline, and that closest point on the polyline
     """

@@ -1,3 +1,4 @@
+import cProfile
 import argparse
 import os
 import time
@@ -127,7 +128,7 @@ def build_board(input_path, output_path):
     print(f"Building the board took {round(duration, 2)} seconds")
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
     parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=int)
@@ -136,3 +137,11 @@ if __name__ == '__main__':
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
     args = parser.parse_args()
     solve(path=args.path, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
+
+
+if __name__ == '__main__':
+    PROFILE = False
+    if PROFILE:
+        cProfile.run('main()', 'profile_results.prof')
+    else:
+        main()

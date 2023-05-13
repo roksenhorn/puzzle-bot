@@ -3,21 +3,25 @@ import yaml
 from typing import List, Tuple
 import multiprocessing
 
-from common import pieces, sides
+from common import pieces, sides, util
+
+
+# Building the graph took 440.38 seconds
 
 
 SOLUTION = [
-    [(1, 0), (4, 2)],
-    [(1, 1), (2, 3)],
-    [(1, 2), None],
-    [(1, 3), (10, 2)],
-    [(3, 3), (2, 1)],
+    # [(1, 0), (4, 2)],
+    # [(1, 1), (2, 3)],
+    # [(1, 2), None],
+    # [(1, 3), (10, 2)],
+    # [(3, 3), (2, 1)],
 ]
 
 
 def build(input_path, output_path, id=None, serialize=False):
     print("> Loading piece data...")
-    ps = pieces.Piece.load_all(input_path)
+    ps = pieces.Piece.load_all(input_path, resample=True)
+    print("\t ...Loaded")
 
     if not serialize and id is None:
         pool = multiprocessing.Pool()
@@ -41,19 +45,23 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
     """
     piece = ps[piece_id]
 
-    for other_piece_id, other_piece in ps.items():
-        if other_piece_id == piece_id:
+    # for all other piece's sides, find the ones that fit with this piece's sides
+    for si, side in enumerate(piece.sides):
+        if side.is_edge:
             continue
 
-        for si, side in enumerate(piece.sides):
-            if side.is_edge:
+        for other_piece_id, other_piece in ps.items():
+            if other_piece_id == piece_id:
                 continue
 
             for sj, other_side in enumerate(other_piece.sides):
                 if other_side.is_edge:
                     continue
 
+                # for debugging, we can optionally provide side-matches from the actual solution and see how well the algo thinks they fit together
                 part_of_solution = ([(piece_id, si), (other_piece_id, sj)] in SOLUTION) or ([(other_piece_id, sj), (piece_id, si)] in SOLUTION)
+
+                # compute the error between our piece's side and this other piece's side
                 error = side.error_when_fit_with(other_side, render=part_of_solution or debug, debug_str=f'{piece_id}[{si}] vs {other_piece_id}[{sj}]')
                 if error <= sides.SIDE_MAX_ERROR_TO_MATCH:
                     piece.fits[si].append((other_piece.id, sj, error))
@@ -61,10 +69,7 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
                 if error > sides.SIDE_MAX_ERROR_TO_MATCH and part_of_solution:
                     raise ValueError(f"Should have matched but didn't: {piece_id}[{si}] vs {other_piece_id}[{sj}]")
 
-    for si, side in enumerate(piece.sides):
-        if side.is_edge:
-            continue
-
+        # make sure we have at least one match
         if len(piece.fits[si]) == 0:
             raise Exception(f'Piece {piece_id} side {si} has no matches but is not an edge')
 
@@ -72,10 +77,10 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
         piece.fits[si] = sorted(piece.fits[si], key=lambda x: x[2])
         least_error = piece.fits[si][0][2]
 
-        print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
-
         # only keep the best matches
-        piece.fits[si] = piece.fits[si][:50]
+        piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * 1.75]
+
+        print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
 
     return (piece_id, piece)
 

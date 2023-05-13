@@ -5,14 +5,14 @@ from common import sides
 
 class Piece(object):
     @staticmethod
-    def load_all(directory):
+    def load_all(directory, resample=False):
         pieces = {}
         i = 1
         done = False
         while not done:
             path = os.path.join(directory, f"side_{i}_0.json")
             if os.path.exists(path):
-                piece = Piece.load(directory, id=i)
+                piece = Piece.load(directory, id=i, resample=resample)
                 pieces[piece.id] = piece
             else:
                 done = True
@@ -21,13 +21,13 @@ class Piece(object):
         return pieces
 
     @classmethod
-    def load(cls, directory, id):
+    def load(cls, directory, id, resample):
         sides_list = []
         for side_index in range(4):
             path = os.path.join(directory, f"side_{id}_{side_index}.json")
             with open(path, "r") as f:
                 data = json.load(f)
-            side = sides.Side(piece_id=id, side_id=side_index, vertices=data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'])
+            side = sides.Side(piece_id=id, side_id=side_index, vertices=data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=resample)
             sides_list.append(side)
         piece = cls(id=id, is_edge=False, sides=sides_list)
         return piece
