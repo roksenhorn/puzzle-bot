@@ -35,8 +35,8 @@ class Piece(object):
     def to_dict(self) -> dict:
         fits = [[], [], [], []]
         for i in range(4):
-            for (other_piece_id, other_side_index, _) in self.fits[i]:
-                fits[i].append([other_piece_id, other_side_index])
+            for (other_piece_id, other_side_index, error) in self.fits[i]:
+                fits[i].append([other_piece_id, other_side_index, round(error * 1000)])
 
         return fits
 

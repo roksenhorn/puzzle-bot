@@ -1,6 +1,7 @@
 import os
 import yaml
 import math
+import heapq
 
 
 """
@@ -160,6 +161,9 @@ class Board(object):
             sides.append(RIGHT)
         return sides
 
+    def __lt__(self, other):
+        return self.placed_count < other.placed_count
+
 
 def build(input_path, output_path):
     print("> Loading connectivity graph...")
@@ -171,8 +175,8 @@ def build(input_path, output_path):
         piece_id = int(piece_id)
         ps[piece_id] = [[], [], [], []]
         for i in range(4):
-            for p, s in fits[i]:
-                ps[piece_id][i].append((p, s))
+            for other_piece_id, other_side_id, error in fits[i]:
+                ps[piece_id][i].append((other_piece_id, other_side_id, error))
 
     board = Board(width=WIDTH, height=HEIGHT)
 
@@ -202,19 +206,22 @@ def build(input_path, output_path):
     direction = RIGHT
     x += 1
 
-    stack = [(board, start_piece_id, start_orientation, x, y, direction)]
+    priority_q = []
+    initial_push = (board, start_piece_id, start_orientation, x, y, direction)
+    heapq.heappush(priority_q, (0, initial_push))
 
     iteration = 0
     longest = 0
-    while stack:
-        board, start_piece_id, start_orientation, x, y, direction = stack.pop()
+    while priority_q:
+        priority, data = heapq.heappop(priority_q)
+        board, start_piece_id, start_orientation, x, y, direction = data
         # print(f"({x}, {y}) moving {direction}")
-        if iteration % 1 == 0:
-            print(f"Iteration {iteration}, longest: {longest}")
+        if iteration % 1000 == 0:
+            print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
 
         if board.placed_count == WIDTH * HEIGHT:
-            print(f"Placed 100 pieces in {iteration} iterations")
+            print(f"Placed {WIDTH * HEIGHT} pieces in {iteration} iterations")
             break
         elif board.placed_count > longest:
             longest = board.placed_count
@@ -223,12 +230,12 @@ def build(input_path, output_path):
         iteration += 1
         # print(f'Checking neighbors of {start_piece_id}[{index_of_neighbor_in_direction}] @ ori {start_orientation} --> checking: {ps[start_piece_id][index_of_neighbor_in_direction]}\n================')
 
-        for neighbor_piece_id, neighbor_side_index in ps[start_piece_id][index_of_neighbor_in_direction]:
+        for neighbor_piece_id, neighbor_side_index, error in ps[start_piece_id][index_of_neighbor_in_direction]:
             neighbor_orientation = (OPPOSITE[direction] - neighbor_side_index) % 4
             # print(f'\t {neighbor_piece_id}[{neighbor_side_index}] @ ori {neighbor_orientation}')
             ok, err = board.can_place(piece_id=neighbor_piece_id, fits=ps[neighbor_piece_id], x=x, y=y, orientation=neighbor_orientation)
             if ok:
-                # print(">>> OK! \t Adding to stack")
+                # print(">>> OK! \t Adding to priority queue")
                 next_board = Board.copy(board)
                 next_board.place(neighbor_piece_id, ps[neighbor_piece_id], x, y, neighbor_orientation)
                 next_direction = direction
@@ -242,13 +249,16 @@ def build(input_path, output_path):
                     next_x = x + (1 if next_direction == RIGHT else -1 if next_direction == LEFT else 0)
                     next_y = y + (1 if next_direction == BOTTOM else -1 if next_direction == TOP else 0)
 
-                stack.append((next_board, neighbor_piece_id, neighbor_orientation, next_x, next_y, next_direction))
+                data = [next_board, neighbor_piece_id, neighbor_orientation, next_x, next_y, next_direction]
+                heapq.heappush(priority_q, (error, data))
 
     if board.placed_count == WIDTH * HEIGHT:
-        print("Found solution after {iteration} iterations!")
+        print(f"Found solution after {iteration} iterations!")
         print(board)
     else:
         raise Exception(f"No solution found after {iteration} iterations, longest found: {longest}")
+
+import random
 
 def _orient_start_corner_to_top_left(p):
     if len(p[0]) == 0 and len(p[1]) == 0:
