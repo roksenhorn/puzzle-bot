@@ -36,8 +36,10 @@ class Orientation(object):
 
 # dimensions for the puzzle you're solving
 # ...I know... :(
-WIDTH = 40
-HEIGHT = 25
+# WIDTH = 40
+# HEIGHT = 25
+WIDTH = 10
+HEIGHT = 10
 
 
 class Board(object):
@@ -166,6 +168,7 @@ def build(input_path, output_path):
 
     ps = {}
     for piece_id, fits in ps_raw.items():
+        piece_id = int(piece_id)
         ps[piece_id] = [[], [], [], []]
         for i in range(4):
             for p, s in fits[i]:
@@ -206,7 +209,7 @@ def build(input_path, output_path):
     while stack:
         board, start_piece_id, start_orientation, x, y, direction = stack.pop()
         # print(f"({x}, {y}) moving {direction}")
-        if iteration % 5000 == 0:
+        if iteration % 1 == 0:
             print(f"Iteration {iteration}, longest: {longest}")
             print(board)
 
@@ -242,10 +245,10 @@ def build(input_path, output_path):
                 stack.append((next_board, neighbor_piece_id, neighbor_orientation, next_x, next_y, next_direction))
 
     if board.placed_count == WIDTH * HEIGHT:
-        print("Found solution!\n", '-' * 80)
+        print("Found solution after {iteration} iterations!")
         print(board)
     else:
-        raise Exception("No solution found")
+        raise Exception(f"No solution found after {iteration} iterations, longest found: {longest}")
 
 def _orient_start_corner_to_top_left(p):
     if len(p[0]) == 0 and len(p[1]) == 0:

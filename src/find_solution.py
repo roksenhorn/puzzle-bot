@@ -17,8 +17,13 @@ SOLUTION_DIR = '4_solution'
 def solve(path, serialize, id, skip_step, stop_step):
     start_time = time.time()
 
-    for d in [INPUT_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]:
+    for i, d in enumerate([INPUT_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
+
+        # wipe any directories we'll act on, except 0 which is the input
+        if i != 0 and i > skip_step + 1 and i < stop_step:
+            for f in os.listdir(os.path.join(path, d)):
+                os.remove(os.path.join(path, d, f))
 
     if skip_step < 0 and stop_step > 0:
         segment_each(input_path=os.path.join(path, INPUT_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)

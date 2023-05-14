@@ -78,7 +78,7 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
         least_error = piece.fits[si][0][2]
 
         # only keep the best matches
-        piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * 1.75]
+        piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * 3.0]
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
 

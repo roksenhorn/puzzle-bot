@@ -8,10 +8,10 @@ from common import util
 SIDE_MAX_ERROR_TO_MATCH = 2.75
 
 # sides must be within this multiple of each other's polyline length
-SIDE_MAX_LENGTH_DISCREPANCY = 0.06
+SIDE_MAX_LENGTH_DISCREPANCY = 0.08
 
 # when we resample a side, we use this many vertices
-SIDE_RESAMPLE_VERTEX_COUNT = 20
+SIDE_RESAMPLE_VERTEX_COUNT = 26
 
 
 class Side(object):
