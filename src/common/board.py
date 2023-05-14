@@ -160,7 +160,8 @@ class Board(object):
 
 
 def build(input_path, output_path):
-    with open(os.path.join(input_path, 'connectivity.yaml'), 'r') as f:
+    print("> Loading connectivity graph...")
+    with open(os.path.join(input_path, 'connectivity.json'), 'r') as f:
         ps_raw = yaml.safe_load(f)
 
     ps = {}
@@ -173,18 +174,20 @@ def build(input_path, output_path):
     board = Board(width=WIDTH, height=HEIGHT)
 
     corners = []
-    for piece_id, fits in ps.items():
-        edge_count = 0
-        for i, fits_i in enumerate(fits):
-            if len(fits_i) == 0:
-                edge_count += 1
+    edges = []
+    edge_length = 2 * (WIDTH + HEIGHT) - 4
+    for piece_id, neighbors in ps.items():
+        edge_count = sum([1 for n in neighbors if len(n) == 0])
+        if edge_count > 0:
+            edges.append(piece_id)
+            if edge_count > 1:
+                corners.append(piece_id)
 
-        if edge_count > 1:
-            corners.append(piece_id)
-
-    print(f"Corners: {corners}")
+    print(f"Corners: {corners}, Edges: {len(edges)}")
     if len(corners) != 4:
         raise Exception(f"Expected 4 corners, got {len(corners)}")
+    if len(edges) != edge_length:
+        raise Exception(f"Expected {edge_length} pieces on the edge, got {len(edges)}")
 
     start_piece_id = corners[0]
     start_piece_fits = ps[start_piece_id]
@@ -238,7 +241,7 @@ def build(input_path, output_path):
 
                 stack.append((next_board, neighbor_piece_id, neighbor_orientation, next_x, next_y, next_direction))
 
-    if board.placed_count == 100:
+    if board.placed_count == WIDTH * HEIGHT:
         print("Found solution!\n", '-' * 80)
         print(board)
     else:

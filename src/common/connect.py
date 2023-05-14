@@ -1,9 +1,9 @@
 import os
-import yaml
-from typing import List, Tuple
+import json
+from typing import List
 import multiprocessing
 
-from common import pieces, sides, util
+from common import pieces, sides
 
 
 # Building the graph took 440.38 seconds
@@ -87,6 +87,6 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
 
 def _save(pieces, out_directory):
     out = { p_id: p.to_dict() for (p_id, p) in pieces.items() }
-    path = os.path.join(out_directory, 'connectivity.yaml')
+    path = os.path.join(out_directory, 'connectivity.json')
     with open(path, 'w') as f:
-        yaml.safe_dump(out, f, default_flow_style=True)
+        json.dump(out, f)
