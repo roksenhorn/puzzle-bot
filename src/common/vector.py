@@ -23,6 +23,37 @@ SIDES_ORTHOGONAL_THRESHOLD_DEG = 42
 EDGE_WIDTH_MIN_RATIO = 0.4
 
 
+class Candidate(object):
+    def __init__(self, v, i, centroid, corner_angle=None):
+        self.v = v
+        self.i = i
+        self.centroid = centroid
+        self.angle = corner_angle or 0
+        self.stdev = 10000
+
+    def score(self):
+        # the higher, the worse the corner
+        # we determine "worst" by a mix of:
+        # - how far from 90º the join angle is
+        # - how far from the center the corner "points": the midangle of the corner typically points quite close to the center of the piece
+        # - how non-straight the spokes are
+
+        # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
+        angle_error = max(0, self.angle - math.pi/2)
+        score = (1.0 * angle_error) + (0.3 * self.stdev)
+        # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
+        return score
+
+    def __repr__(self) -> str:
+        return f"Candidate(v={self.v}, i={self.i}, angle={self.angle}), score={self.score()}"
+
+    def __eq__(self, __value: object) -> bool:
+        return self.i == __value.i
+
+    def __hash__(self) -> int:
+        return hash(self.i)
+
+
 class Vector(object):
     @staticmethod
     def from_file(filename, id) -> 'Vector':
@@ -187,8 +218,137 @@ class Vector(object):
                 i += 1
 
     def find_four_corners(self):
-        vertices = self.vertices
+        candidates = self.find_candidates_by_distance_maxima_from_center()
+        candidates = self.nudge_to_angular_corners(candidates)
+        self.select_best_corners(candidates)
 
+    def find_candidates_by_distance_maxima_from_center(self):
+        """
+        Looks for local maximas in the distance from the centroid to the vertices
+        """
+        distances = [util.distance(v, self.centroid) for v in self.vertices]
+        candidates = []
+        for i in range(len(distances)):
+            prev_distances = util.slice(distances, i - 7, i - 1)
+            next_distances = util.slice(distances, i + 1, i + 7)
+            if distances[i] >= max(prev_distances) and distances[i] >= max(next_distances):
+                candidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid)
+                candidates.append(candidate)
+
+        return candidates
+
+    def nudge_to_angular_corners(self, candidates):
+        """
+        Sometimes the local maxima is not at the corner of two spokes, but rather just along one of the spokes
+        Let's nudge it to the best corner vertex and compute the angle that this corner represents
+        """
+        def angle_at(i):
+            """
+            Compute the angle of the path at the given index by looking ±4 points away
+            """
+            h = (i - 4) % len(self.vertices)
+            i = i % len(self.vertices)
+            j = (i + 4) % len(self.vertices)
+            v_h = self.vertices[h]
+            v_i = self.vertices[i]
+            v_j = self.vertices[j]
+            angle = util.counterclockwise_angle_between_vectors(v_h, v_i, v_j)
+            return angle
+
+        refined_candidates = []
+        for candidate in candidates:
+            angles = [(i, angle_at(i)) for i in range(candidate.i - 4, candidate.i + 5)]
+            closest_to_90 = min(angles, key=lambda a: abs(a[1] - math.pi/2))
+            new_candidate = Candidate(v=self.vertices[closest_to_90[0]], i=closest_to_90[0], centroid=self.centroid, corner_angle=closest_to_90[1])
+            refined_candidates.append(new_candidate)
+
+        for c in refined_candidates:
+            # find the angle from i to the points before it (h), and i to the points after (j)
+            vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
+            vec_len = 12  # compare this many total points
+            a_ih, stdev_h = util.colinearity(from_point=c.v, to_points=util.slice(self.vertices, c.i-vec_len-vec_offset, c.i-vec_offset-1))
+            a_ij, stdev_j = util.colinearity(from_point=c.v, to_points=util.slice(self.vertices, c.i+vec_offset+1, c.i+vec_len+vec_offset))
+            c.stdev = (stdev_h + stdev_j)/2
+
+        return refined_candidates
+
+    def select_best_corners(self, candidates):
+        """
+        We look at the sharpness and the relative position to figure out which candidates make
+        the best set of 4 corners
+
+        We first compute a goodness score for each individual corner
+        Then we find which set of 4 corners has the best cumulative score, where we'll weigh
+        individual corner scores, plus how evenly spread out the 4 corners are (radially)
+        """
+        # compute each corner's score, and only consider the n best corners
+        candidates = sorted(candidates, key=lambda c: c.score())[:8]
+
+        # eliminate duplicates
+        candidates = list(set(candidates))
+
+        def _score_4_candidates(cs):
+            """
+            Given a set of 4 candidate corners, we produce a unitless score for how good they are
+            Lower is better
+            """
+            # first, start with the score of each individual corner (how close ot 90º it is, etc)
+            score = sum([c.score() for c in cs])
+
+            # now, we want the corners to be roughly evenly spaced radially around the piece
+            radial_positions = sorted([util.angle_between(self.centroid, c.v) for c in cs])
+            max_radial_gap = 0
+            min_radial_gap = 2 * math.pi
+            side_lens = []
+            for i in range(4):
+                p1 = radial_positions[i]
+                p2 = radial_positions[(i + 1) % 4]
+                angle_between = util.compare_angles(p1, p2)
+                if angle_between > max_radial_gap:
+                    max_radial_gap = angle_between
+                if angle_between < min_radial_gap:
+                    min_radial_gap = angle_between
+
+                side_len = util.distance(cs[i].v, cs[(i + 1) % 4].v)
+                side_lens.append(side_len)
+
+            # we want them to be roughly evenly spaced radially around the piece
+            biggest_gap_penalty = max((max_radial_gap - math.pi/2), 0)
+            smallest_gap_penalty = max((math.pi/2 - min_radial_gap), 0)
+            score += biggest_gap_penalty + smallest_gap_penalty
+
+            # we also want them to form a rectangle, where opposing sides are roughly the same length (not polyline length, but straight line length)
+            len_ratio_s0_s2 = abs(1.0 - side_lens[0] / side_lens[2])
+            len_ratio_s1_s3 = abs(1.0 - side_lens[1] / side_lens[3])
+            len_ratio_penalty = 0.5 * (len_ratio_s0_s2 + len_ratio_s1_s3)
+            score += len_ratio_penalty
+
+            return cs, score
+
+        # Generate all combinations of 4 corners and score them each up
+        all_combinations = list(itertools.combinations(candidates, 4))
+        all_scores = sorted([_score_4_candidates(c) for c in all_combinations], key=lambda c: c[1])
+        best_corners = sorted(all_scores[0][0], key=lambda c: util.angle_between(self.centroid, c.v))
+        self.corners = [c.v for c in best_corners]
+        self.corner_indices = [c.i for c in best_corners]
+
+        # the four corners should be roughly 90º from each other
+        # we'll use the angle between the spokes to determine this
+        corner_angles = [util.angle_between(self.centroid, c) for c in self.corners]
+        for i in range(4):
+            j = (i + 1) % 4
+            angle = corner_angles[i]
+            angle_next = corner_angles[j]
+            angle_between = util.compare_angles(angle, angle_next)
+            delta_90 = util.compare_angles(math.pi/2, angle_between)
+            if delta_90 > 45 * math.pi/180:
+                raise Exception(f"Corner angles are not roughly 90º: {round(angle * 180 / math.pi)}º and {round(angle_next * 180 / math.pi)}º = {round(angle_between * 180 / math.pi)}º apart, on piece {self.id}")
+
+    def find_corner_candidates_by_consecutive_angles(self):
+        """
+        Unused
+        """
+        vertices = self.vertices
         possible_corners = []
 
         # to find a corner, we're going to compute the angle between 3 consecutive points
@@ -272,84 +432,7 @@ class Vector(object):
             print(eliminated_corner_indices)
             raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
 
-        # now lets figure out which are the best corners
-        # we first compute a goodness score for each individual corner
-        # then we find which set of 4 corners has the best cumulative score, where we'll weigh
-        # individual corner scores, plus how evenly spread out the 4 corners are (radially)
-        def _score_corner(corner_data):
-            # the higher, the worse the corner
-            # we determine "worst" by a mix of:
-            # - how far from 90º the join angle is
-            # - how far from the center the corner "points": the midangle of the corner typically points quite close to the center of the piece
-            # - how non-straight the spokes are
-
-            index, vertex, angle, stdev, offset_from_center = corner_data
-
-            # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
-            angle_error = max(0, angle - math.pi/2)
-
-            score = (1.0 * angle_error) + (1.5 * offset_from_center) + (0.3 * stdev)
-            # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
-            return index, vertex, score
-
-        def _score_4_corners(cs):
-            """
-            Given a set of 4 candidate corners, we produce a unitless score for how good they are
-            Lower is better
-            """
-            # first, start with the score of each individual corner (how close ot 90º it is, etc)
-            score = sum([c[2] for c in cs])
-
-            radial_positions = sorted([util.angle_between(self.centroid, c[1]) for c in cs])
-            max_radial_gap = 0
-            min_radial_gap = 2 * math.pi
-            side_lens = []
-            for i in range(4):
-                p1 = radial_positions[i]
-                p2 = radial_positions[(i + 1) % 4]
-                angle_between = util.compare_angles(p1, p2)
-                if angle_between > max_radial_gap:
-                    max_radial_gap = angle_between
-                if angle_between < min_radial_gap:
-                    min_radial_gap = angle_between
-
-                side_len = util.distance(cs[i][1], cs[(i + 1) % 4][1])
-                side_lens.append(side_len)
-
-            # we want them to be roughly evenly spaced radially around the piece
-            biggest_gap_penalty = max((max_radial_gap - math.pi/2), 0)
-            smallest_gap_penalty = max((math.pi/2 - min_radial_gap), 0)
-            score += biggest_gap_penalty + smallest_gap_penalty
-
-            # we also want them to form a rectangle, where opposing sides are roughly the same length (not polyline length, but straight line length)
-            len_ratio_s0_s2 = abs(1.0 - side_lens[0] / side_lens[2])
-            len_ratio_s1_s3 = abs(1.0 - side_lens[1] / side_lens[3])
-            len_ratio_penalty = 0.5 * (len_ratio_s0_s2 + len_ratio_s1_s3)
-            score += len_ratio_penalty
-
-            return cs, score
-
-        # compute each corner's score, and only consider the n best corners
-        possible_corners = sorted([_score_corner(c) for c in possible_corners], key=lambda c: c[2])[:8]
-
-        # Generate all combinations of 4 corners and score them each up
-        all_combinations = list(itertools.combinations(possible_corners, 4))
-        all_scores = sorted([_score_4_corners(c) for c in all_combinations], key=lambda c: c[1])
-        best_corners = sorted(all_scores[0][0], key=lambda c: util.angle_between(self.centroid, c[1]))
-        self.corners = [c[1] for c in best_corners]
-        self.corner_indices = [c[0] for c in best_corners]
-
-        # the four corners should be roughly 90º from each other
-        # we'll use the angle between the spokes to determine this
-        corner_angles = [util.angle_between(self.centroid, c) for c in self.corners]
-        for i in range(4):
-            j = (i + 1) % 4
-            angle = corner_angles[i]
-            angle_next = corner_angles[j]
-            angle_between = util.compare_angles(angle, angle_next)
-            delta_90 = util.compare_angles(math.pi/2, angle_between)
-            if delta_90 > 45 * math.pi/180:
-                raise Exception(f"Corner angles are not roughly 90º: {round(angle * 180 / math.pi)}º and {round(angle_next * 180 / math.pi)}º = {round(angle_between * 180 / math.pi)}º apart, on piece {self.id}")
+        return possible_corners
 
     def extract_four_sides(self) -> None:
         """
