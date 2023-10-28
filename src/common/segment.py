@@ -4,8 +4,8 @@ from typing import List, Tuple
 from common import util
 
 
-SEG_THRESH = (190*3)
-SCALE_BY = 0.15
+SEG_THRESH = (125*3)
+SCALE_BY = 0.12
 
 
 def segment(filename, output_path=None, scale_by=SCALE_BY,

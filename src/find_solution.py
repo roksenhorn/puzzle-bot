@@ -3,6 +3,7 @@ import argparse
 import os
 import time
 import multiprocessing
+import re
 
 from common import board, connect, segment, util, vector
 
@@ -133,6 +134,26 @@ def build_board(input_path, output_path):
     print(f"Building the board took {round(duration, 2)} seconds")
 
 
+def rename(path):
+    d = os.path.join(path, INPUT_DIR)
+
+    # for each file in this directory, rename it to i.jpeg
+    i = 1
+    previous_files = os.listdir(d)
+    for f in previous_files:
+        dest = os.path.join(d, f'{i}.jpeg.tmp')
+        os.rename(os.path.join(d, f), dest)
+        i += 1
+
+    i = 1
+    previous_files = os.listdir(d)
+    for f in previous_files:
+        dest = os.path.join(d, f'{i}.jpeg')
+        os.rename(os.path.join(d, f), dest)
+        i += 1
+    print(f"Renamed {len(previous_files)} files")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
@@ -140,7 +161,12 @@ def main():
     parser.add_argument('--skip-step', default=-1, required=False, help='Start processing from after this step', type=int)
     parser.add_argument('--stop-at-step', default=10, required=False, help='Stop processing at this step', type=int)
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
+    parser.add_argument('--rename', default=False, action="store_true", help='Renames the input files to 1.jpeg, 2.jpeg, ...')
     args = parser.parse_args()
+
+    if args.rename:
+        rename(path=args.path)
+
     solve(path=args.path, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
 
 

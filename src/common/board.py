@@ -37,10 +37,10 @@ class Orientation(object):
 
 # dimensions for the puzzle you're solving
 # ...I know... :(
-# WIDTH = 40
-# HEIGHT = 25
-WIDTH = 10
-HEIGHT = 10
+WIDTH = 40
+HEIGHT = 25
+# WIDTH = 10
+# HEIGHT = 10
 
 
 class Board(object):
