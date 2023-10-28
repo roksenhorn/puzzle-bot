@@ -24,12 +24,13 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 
 class Candidate(object):
-    def __init__(self, v, i, centroid, corner_angle=None):
+    def __init__(self, v, i, centroid, corner_angle=None, offset_from_center=None):
         self.v = v
         self.i = i
         self.centroid = centroid
-        self.angle = corner_angle or 0
+        self.angle = corner_angle or 10000
         self.stdev = 10000
+        self.offset_from_center = offset_from_center
 
     def score(self):
         # the higher, the worse the corner
@@ -40,12 +41,12 @@ class Candidate(object):
 
         # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
         angle_error = max(0, self.angle - math.pi/2)
-        score = (1.0 * angle_error) + (0.3 * self.stdev)
+        score = (1.0 * angle_error) + (1.5 * self.offset_from_center) + (0.3 * self.stdev)
         # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
         return score
 
     def __repr__(self) -> str:
-        return f"Candidate(v={self.v}, i={self.i}, angle={self.angle}), score={self.score()}"
+        return f"Candidate(v={self.v}, i={self.i}, angle={self.angle}), offset={self.offset_from_center}, score={self.score()}"
 
     def __eq__(self, __value: object) -> bool:
         return self.i == __value.i
@@ -219,6 +220,7 @@ class Vector(object):
 
     def find_four_corners(self):
         candidates = self.find_candidates_by_distance_maxima_from_center()
+        candidates += self.find_corner_candidates_by_spoke_angles()
         candidates = self.nudge_to_angular_corners(candidates)
         self.select_best_corners(candidates)
 
@@ -253,15 +255,22 @@ class Vector(object):
             v_i = self.vertices[i]
             v_j = self.vertices[j]
             angle = util.counterclockwise_angle_between_vectors(v_h, v_i, v_j)
-            return angle
+
+            a_ic = util.angle_between(v_i, self.centroid)
+            opens_toward_angle = util.angle_between(v_i, util.midpoint(v_h, v_j))
+            offset_from_center = util.compare_angles(opens_toward_angle, a_ic)
+
+            return angle, offset_from_center
 
         refined_candidates = []
         for candidate in candidates:
             angles = [(i, angle_at(i)) for i in range(candidate.i - 4, candidate.i + 5)]
-            closest_to_90 = min(angles, key=lambda a: abs(a[1] - math.pi/2))
-            new_candidate = Candidate(v=self.vertices[closest_to_90[0]], i=closest_to_90[0], centroid=self.centroid, corner_angle=closest_to_90[1])
+            closest_to_90 = min(angles, key=lambda a: abs(a[1][0] - math.pi/2))
+            i, angle, offset_from_center = closest_to_90[0], closest_to_90[1][0], closest_to_90[1][1]
+            new_candidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center)
             refined_candidates.append(new_candidate)
 
+        # compute how close to straight both spokes are
         for c in refined_candidates:
             # find the angle from i to the points before it (h), and i to the points after (j)
             vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
@@ -344,12 +353,12 @@ class Vector(object):
             if delta_90 > 45 * math.pi/180:
                 raise Exception(f"Corner angles are not roughly 90º: {round(angle * 180 / math.pi)}º and {round(angle_next * 180 / math.pi)}º = {round(angle_between * 180 / math.pi)}º apart, on piece {self.id}")
 
-    def find_corner_candidates_by_consecutive_angles(self):
+    def find_corner_candidates_by_spoke_angles(self):
         """
         Unused
         """
         vertices = self.vertices
-        possible_corners = []
+        candidates = []
 
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
@@ -398,11 +407,8 @@ class Vector(object):
 
             is_corner = is_roughly_90 and is_pointed_toward_center
             if is_corner:
-                # print(f"Found possible corner at {i}: {p_i} w/ {stdev}")
-                # print(f"\t c={self.centroid} \t ih={round(angle_ih * 180 / math.pi)} \t ic={round(a_ic * 180 / math.pi)} \t ij={round(a_ij * 180 / math.pi)} \t offset={round(offset_from_center * 180 / math.pi)}")
-                # print(f"\t angle width: {round(angle_hij * 180 / math.pi)}")
-                # print(f"\t roughly 90? {is_roughly_90} \t toward center? {is_pointed_toward_center} \t open toward {round(opens_toward_angle * 180 / math.pi)} \t offset from center {round(offset_from_center * 180 / math.pi)}")
-                possible_corners.append((i, p_i, angle_hij, stdev, offset_from_center))
+                candidate = Candidate(v=p_i, i=i, centroid=self.centroid, corner_angle=angle_hij, offset_from_center=offset_from_center)
+                candidates.append(candidate)
             elif debug:
                 print(f"NOT a possible corner at {i}: {p_i} w/ {stdev}")
                 print(f"\t c={self.centroid} \t ih={round(angle_ih * 180 / math.pi)} \t ic={round(a_ic * 180 / math.pi)} \t ij={round(a_ij * 180 / math.pi)} \t offset={round(offset_from_center * 180 / math.pi)}")
@@ -412,27 +418,27 @@ class Vector(object):
         # we often find a handful of points right near the corner
         # let's go through and pick the best of those
         eliminated_corner_indices = []
-        for i, corner, angle, stdev, offset_from_center in possible_corners:
-            if i in eliminated_corner_indices:
+        for c in candidates:
+            if c.i in eliminated_corner_indices:
                 # if we've been ruled out, no work to do
                 continue
 
-            for j, corner_j, angle, stdev_j, _ in possible_corners:
+            for c2 in candidates:
                 # if we're close to another candidate, figure out if we're the better corner
-                if i != j and util.distance(corner, corner_j) < 10:
+                if c.i != c2.i and util.distance(c.v, c2.v) < 10:
                     # choose the corner thats furthest from the center of the piece, meaning it juts out the most
-                    d_centroid_i = util.distance(corner, self.centroid)
-                    d_centroid_j = util.distance(corner_j, self.centroid)
+                    d_centroid_i = util.distance(c.v, self.centroid)
+                    d_centroid_j = util.distance(c2.v, self.centroid)
                     if d_centroid_i >= d_centroid_j:
-                        eliminated_corner_indices.append(j)
+                        eliminated_corner_indices.append(c2.i)
 
-        possible_corners = [c for c in possible_corners if c[0] not in eliminated_corner_indices]
+        candidates = [c for c in candidates if c.i not in eliminated_corner_indices]
 
-        if len(possible_corners) < 4:
+        if len(candidates) < 4:
             print(eliminated_corner_indices)
-            raise Exception(f"Expected 4 corners, but only found {len(possible_corners)} on piece {self.id}")
+            raise Exception(f"Expected 4 corners, but only found {len(candidates)} on piece {self.id}")
 
-        return possible_corners
+        return candidates
 
     def extract_four_sides(self) -> None:
         """
@@ -482,9 +488,12 @@ class Vector(object):
             raise Exception(f"Expected sides 0 and 1 to be at a right angle, but they are not ({self.sides[1].angle} - {self.sides[0].angle})")
 
         lengths = [s.length for s in self.sides]
-        len_ratio02 = abs(lengths[0] - lengths[2])/lengths[0]
-        len_ratio13 = abs(lengths[1] - lengths[3])/lengths[1]
+        avg02 = (lengths[0] + lengths[2])/2
+        avg13 = (lengths[1] + lengths[3])/2
+        len_ratio02 = abs(lengths[0] - lengths[2])/avg02
+        len_ratio13 = abs(lengths[1] - lengths[3])/avg13
         if len_ratio02 > 0.55 or len_ratio13 > 0.55:
+            print(f"Lengths: {lengths}; ratios: {len_ratio02}, {len_ratio13}")
             raise Exception(f"Expected sides to be roughly the same length, but they are not ({len_ratio02}, {len_ratio13})")
 
         d02 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
