@@ -139,17 +139,22 @@ def rename(path):
 
     # for each file in this directory, rename it to i.jpeg
     i = 1
-    previous_files = os.listdir(d)
+
+    # only rename jpg or jpeg
+    previous_files = [f for f in os.listdir(d) if re.match(r'.*\.jpe?g', f)]
+    print(f"There are {len(previous_files)} files to rename")
+
     for f in previous_files:
+        src = os.path.join(d, f)
         dest = os.path.join(d, f'{i}.jpeg.tmp')
-        os.rename(os.path.join(d, f), dest)
+        os.rename(src, dest)
         i += 1
 
     i = 1
-    previous_files = os.listdir(d)
     for f in previous_files:
+        src = os.path.join(d, f'{i}.jpeg.tmp')
         dest = os.path.join(d, f'{i}.jpeg')
-        os.rename(os.path.join(d, f), dest)
+        os.rename(src, dest)
         i += 1
     print(f"Renamed {len(previous_files)} files")
 
