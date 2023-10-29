@@ -24,12 +24,12 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 
 class Candidate(object):
-    def __init__(self, v, i, centroid, corner_angle=None, offset_from_center=None):
+    def __init__(self, v, i, centroid, corner_angle=10000, offset_from_center=10000, stdev=10000):
         self.v = v
         self.i = i
         self.centroid = centroid
-        self.angle = corner_angle or 10000
-        self.stdev = 10000
+        self.angle = corner_angle
+        self.stdev = stdev
         self.offset_from_center = offset_from_center
 
     def score(self):
@@ -49,10 +49,10 @@ class Candidate(object):
         return f"Candidate(v={self.v}, i={self.i}, angle={self.angle}), offset={self.offset_from_center}, score={self.score()}"
 
     def __eq__(self, __value: object) -> bool:
-        return self.i == __value.i
+        return (self.v[0] == __value.v[0]) and (self.v[1] == __value.v[1])
 
     def __hash__(self) -> int:
-        return hash(self.i)
+        return hash(self.v[0]) + hash(self.v[1])
 
 
 class Vector(object):
@@ -244,6 +244,10 @@ class Vector(object):
         Sometimes the local maxima is not at the corner of two spokes, but rather just along one of the spokes
         Let's nudge it to the best corner vertex and compute the angle that this corner represents
         """
+
+        # eliminate duplicates
+        candidates = list(set(candidates))
+
         def angle_at(i):
             """
             Compute the angle of the path at the given index by looking ±4 points away
@@ -262,24 +266,40 @@ class Vector(object):
 
             return angle, offset_from_center
 
+        # Look a few before and a few after to see if a nearby vertex is a better corner
+        # do this by comparing how close to 90º the angle is, and how straight the spokes are
         refined_candidates = []
         for candidate in candidates:
+            debug = (candidate.v[1] < 5)
+            if debug:
+                print(candidate)
             angles = [(i, angle_at(i)) for i in range(candidate.i - 4, candidate.i + 5)]
-            closest_to_90 = min(angles, key=lambda a: abs(a[1][0] - math.pi/2))
-            i, angle, offset_from_center = closest_to_90[0], closest_to_90[1][0], closest_to_90[1][1]
-            new_candidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center)
+            stdevs = [self.compute_stdev(self.vertices, i) for i in range(candidate.i - 4, candidate.i + 5)]
+            dist_from_90 = [(i, abs(a[0] - math.pi/2), a[1]) for (i, a) in angles]
+            scaled_by_stdev = [(i, a * s, o, s) for (i, a, o), s in zip(dist_from_90, stdevs)]
+
+            if debug:
+                for j in range(len(angles)):
+                    i, (a, o) = angles[j]
+                    v = self.vertices[i]
+                    d90 = dist_from_90[j][1]
+                    _, scaled, _, stdev = scaled_by_stdev[j]
+                    print(f"\t{i}:   ({v[0]}, {v[1]}) {round(a * 180 / math.pi, 1)}º \t {round(d90 * 180/math.pi, 1)}° \t stdev: {stdev} => {scaled}")
+
+            best = min(scaled_by_stdev, key=lambda x: x[1])
+            i, angle, offset_from_center, stdev = best[0], best[1], best[2], best[3]
+            new_candidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center, stdev=stdev)
             refined_candidates.append(new_candidate)
 
-        # compute how close to straight both spokes are
-        for c in refined_candidates:
-            # find the angle from i to the points before it (h), and i to the points after (j)
-            vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = 12  # compare this many total points
-            a_ih, stdev_h = util.colinearity(from_point=c.v, to_points=util.slice(self.vertices, c.i-vec_len-vec_offset, c.i-vec_offset-1))
-            a_ij, stdev_j = util.colinearity(from_point=c.v, to_points=util.slice(self.vertices, c.i+vec_offset+1, c.i+vec_len+vec_offset))
-            c.stdev = (stdev_h + stdev_j)/2
-
         return refined_candidates
+
+    def compute_stdev(self, vertices, i):
+        # find the angle from i to the points before it (h), and i to the points after (j)
+        vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
+        vec_len = 12  # compare this many total points
+        a_ih, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
+        a_ij, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
+        return (stdev_h + stdev_j)/2
 
     def select_best_corners(self, candidates):
         """
@@ -290,11 +310,11 @@ class Vector(object):
         Then we find which set of 4 corners has the best cumulative score, where we'll weigh
         individual corner scores, plus how evenly spread out the 4 corners are (radially)
         """
-        # compute each corner's score, and only consider the n best corners
-        candidates = sorted(candidates, key=lambda c: c.score())[:8]
-
         # eliminate duplicates
         candidates = list(set(candidates))
+
+        # compute each corner's score, and only consider the n best corners
+        candidates = sorted(candidates, key=lambda c: c.score())[:8]
 
         def _score_4_candidates(cs):
             """
