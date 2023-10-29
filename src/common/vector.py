@@ -33,20 +33,20 @@ class Candidate(object):
         self.offset_from_center = offset_from_center
 
     def score(self):
-        # the higher, the worse the corner
+        # lower score = better candidate for a corner
         # we determine "worst" by a mix of:
         # - how far from 90º the join angle is
         # - how far from the center the corner "points": the midangle of the corner typically points quite close to the center of the piece
         # - how non-straight the spokes are
 
-        # how much bigger are we than 90º? If we're less, then we're more likely to be a corner
-        angle_error = max(0, self.angle - math.pi/2)
-        score = (1.0 * angle_error) + (1.5 * self.offset_from_center) + (0.3 * self.stdev)
-        # print(f"CORNER[{v_i}]: {v_corner} \t opposite: {round(angle_to_opposite_corner * 180/math.pi)} \t angle error: {angle_error} \t offset: {offset_from_center} \t proximity_penalty: {proximity_penalty} \t ==> mix: {score}")
+        # how much bigger are we than 90º?
+        # If we're less, then we're more likely to be a corner so we let this go below zero
+        angle_error = self.angle - math.pi/2
+        score = (1.0 * angle_error) + (0.5 * self.offset_from_center) + (0.7 * self.stdev)
         return score
 
     def __repr__(self) -> str:
-        return f"Candidate(v={self.v}, i={self.i}, angle={self.angle}), offset={self.offset_from_center}, score={self.score()}"
+        return f"Candidate(v={self.v}, i={self.i}, angle={round(self.angle * 180/math.pi, 1)}°, orientation offset={round(self.offset_from_center * 180/math.pi, 1)}°, stdev={self.stdev}, score={self.score()}"
 
     def __eq__(self, __value: object) -> bool:
         return (self.v[0] == __value.v[0]) and (self.v[1] == __value.v[1])
@@ -266,40 +266,55 @@ class Vector(object):
 
             return angle, offset_from_center
 
-        # Look a few before and a few after to see if a nearby vertex is a better corner
-        # do this by comparing how close to 90º the angle is, and how straight the spokes are
+        # Look a few before and a few after to see if a nearby vertex is a better corner candidate
         refined_candidates = []
         for candidate in candidates:
-            debug = (candidate.v[1] < 5)
+            debug = (candidate.v[1] < -5)
             if debug:
                 print(candidate)
-            angles = [(i, angle_at(i)) for i in range(candidate.i - 4, candidate.i + 5)]
-            stdevs = [self.compute_stdev(self.vertices, i) for i in range(candidate.i - 4, candidate.i + 5)]
-            dist_from_90 = [(i, abs(a[0] - math.pi/2), a[1]) for (i, a) in angles]
-            scaled_by_stdev = [(i, a * s, o, s) for (i, a, o), s in zip(dist_from_90, stdevs)]
 
-            if debug:
-                for j in range(len(angles)):
-                    i, (a, o) = angles[j]
+            subcandidates = []
+            for j in range(-4, 5):
+                angle, offset_from_center, stdev = self.compute_angle_and_stdev(self.vertices, candidate.i + j)
+                i = (candidate.i + j) % len(self.vertices)
+                subcandidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center, stdev=stdev)
+                if debug:
                     v = self.vertices[i]
-                    d90 = dist_from_90[j][1]
-                    _, scaled, _, stdev = scaled_by_stdev[j]
-                    print(f"\t{i}:   ({v[0]}, {v[1]}) {round(a * 180 / math.pi, 1)}º \t {round(d90 * 180/math.pi, 1)}° \t stdev: {stdev} => {scaled}")
+                    print(f"\t{j}:    ({v[0]}, {v[1]}) \t {subcandidate}")
+                subcandidates.append(subcandidate)
 
-            best = min(scaled_by_stdev, key=lambda x: x[1])
-            i, angle, offset_from_center, stdev = best[0], best[1], best[2], best[3]
-            new_candidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center, stdev=stdev)
-            refined_candidates.append(new_candidate)
+            # pick the best subcandidate
+            best = min(subcandidates, key=lambda c: c.score())
+            if debug:
+                print("Best: " + str(best))
+            refined_candidates.append(best)
 
         return refined_candidates
 
-    def compute_stdev(self, vertices, i):
+    def compute_angle_and_stdev(self, vertices, i):
+        i = i % len(self.vertices)
+        v_i = self.vertices[i]
+
         # find the angle from i to the points before it (h), and i to the points after (j)
         vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
         vec_len = 12  # compare this many total points
+
+        # see how straight the spokes are from this point, and what angle they jut out at
         a_ih, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
         a_ij, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
-        return (stdev_h + stdev_j)/2
+
+        # extend out along the avg spoke direction
+        p_h = (v_i[0] + 10 * math.cos(a_ih), v_i[1] + 10 * math.sin(a_ih))
+        p_j = (v_i[0] + 10 * math.cos(a_ij), v_i[1] + 10 * math.sin(a_ij))
+
+        # how wide is the angle between the two legs?
+        angle_hij = util.counterclockwise_angle_between_vectors(p_h, v_i, p_j)
+
+        a_ic = util.angle_between(v_i, self.centroid)
+        opens_toward_angle = util.angle_between(v_i, util.midpoint(p_h, p_j))
+        offset_from_center = util.compare_angles(opens_toward_angle, a_ic)
+
+        return angle_hij, offset_from_center, (stdev_h + stdev_j)/2
 
     def select_best_corners(self, candidates):
         """
