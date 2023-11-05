@@ -5,7 +5,7 @@ from common import util
 
 
 # Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 2.75
+SIDE_MAX_ERROR_TO_MATCH = 0.70
 
 # sides must be within this multiple of each other's polyline length
 SIDE_MAX_LENGTH_DISCREPANCY = 0.08
@@ -76,10 +76,9 @@ class Side(object):
 
         error, shift = util.error_between_polylines(polyline1, polyline2, p1_len=side.v_length)
 
-        if render and debug_str:
+        if render and debug_str and error <= SIDE_MAX_ERROR_TO_MATCH:
             shifted0 = [(x - shift[0], y - shift[1]) for x, y in polyline1]
             print(f"\t ==> Error = {error}, shift: {shift}")
-            util.render_polylines([polyline1, polyline2])
             util.render_polylines([shifted0, polyline2])
 
         return error

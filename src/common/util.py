@@ -30,6 +30,9 @@ def load_binary_image(path):
     # Convert pixels to 0 or 1 2D array
     binary_pixels = []
     for i, pixel in enumerate(pixels):
+        if type(pixel) == tuple:
+            pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
+            pixel = 0 if pixel_val > 100 else 1
         x = i % width
         y = i // width
         if y >= len(binary_pixels):

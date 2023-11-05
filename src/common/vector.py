@@ -42,15 +42,15 @@ class Candidate(object):
         # - how non-straight the spokes are
 
         # how much bigger are we than 90º?
-        # If we're less, then we're more likely to be a corner so we let this go below zero
-        angle_error = self.angle - math.pi/2
+        # If we're less, then we're more likely to be a corner so we don't penalize for below 90º
+        angle_error = max(0, self.angle - math.pi/2)
         pointed_away_from_center_penalty = 0.5 if not self.is_pointed_toward_center else 0.0
-        score = (0.8 * angle_error) + (0.6 * self.offset_from_center) + (0.9 * self.stdev) + pointed_away_from_center_penalty
+        score = (0.75 * angle_error) + (0.35 * self.offset_from_center) + (1.8 * self.stdev) + pointed_away_from_center_penalty
         return score
 
     def __repr__(self) -> str:
         toward_or_away = "toward center" if self.is_pointed_toward_center else "away from center"
-        return f"Candidate(v={self.v}, i={self.i}, angle={round(self.angle * 180/math.pi, 1)}°, orientation offset={round(self.offset_from_center * 180/math.pi, 1)}°, midangle={round(self.midangle * 180/math.pi, 2)}°, stdev={self.stdev}, score={self.score()}, {toward_or_away}"
+        return f"Candidate(v={self.v}, i={self.i}, angle={round(self.angle * 180/math.pi, 1)}°, orientation offset={round(self.offset_from_center * 180/math.pi, 1)}°, midangle={round(self.midangle * 180/math.pi, 2)}°, stdev={self.stdev}, score={self.score()}, {toward_or_away})"
 
     def __eq__(self, __value: object) -> bool:
         return (self.v[0] == __value.v[0]) and (self.v[1] == __value.v[1])
@@ -228,6 +228,9 @@ class Vector(object):
         candidates = self.nudge_to_angular_corners(candidates)
         self.select_best_corners(candidates)
 
+        if len(self.corners) != 4:
+            raise Exception(f"Expected 4 corners, found {len(self.corners)} on piece {self.id}")
+
     def find_candidates_by_distance_maxima_from_center(self):
         """
         Looks for local maximas in the distance from the centroid to the vertices
@@ -323,7 +326,7 @@ class Vector(object):
         refined_candidates = []
         visited = set()
         for candidate in candidates:
-            debug = (candidate.v[1] < -500)
+            debug = (candidate.v[1] == -87)
             if debug:
                 print(candidate)
 
@@ -354,10 +357,13 @@ class Vector(object):
     def compute_angle_and_stdev(self, vertices, i):
         i = i % len(self.vertices)
         v_i = self.vertices[i]
+        debug = v_i == (34, -1)
+        if debug:
+            print(v_i)
 
         # find the angle from i to the points before it (h), and i to the points after (j)
         vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-        vec_len = 12  # compare this many total points
+        vec_len = 10  # compare this many total points
 
         # see how straight the spokes are from this point, and what angle they jut out at
         a_ih, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
@@ -376,6 +382,12 @@ class Vector(object):
 
         is_pointed_toward_center = offset_from_center < angle_hij / 2
 
+        if debug:
+            print(f"v: {v_i}, c: {self.centroid} => {round(a_ic * 180 / math.pi)}°")
+            print(f"width: {round(angle_hij * 180 / math.pi)}°, ray out center of this angle: {round(opens_toward_angle * 180 / math.pi)}°")
+            print(f"a_ih: {round(a_ih * 180 / math.pi)}°, a_ij: {round(a_ij * 180 / math.pi)}°")
+            print(f"a_ic: {round(a_ic * 180 / math.pi)}°, offset: {round(offset_from_center * 180 / math.pi)}°")
+
         return angle_hij, offset_from_center, opens_toward_angle, is_pointed_toward_center, (stdev_h + stdev_j)/2
 
     def select_best_corners(self, candidates):
@@ -392,6 +404,9 @@ class Vector(object):
 
         # compute each corner's score, and only consider the n best corners
         candidates = sorted(candidates, key=lambda c: c.score())[:12]
+
+        # for c in candidates:
+        #     print(c)
 
         def _score_2_candidates(c0, c1):
             """
@@ -417,6 +432,11 @@ class Vector(object):
                 print(f"\tradial_pos0: {round(radial_pos0 * 180 / math.pi)}º, radial_pos1: {round(radial_pos1 * 180 / math.pi)}º, delta: {round(radial_delta * 180 / math.pi)}º, d180: {round(d180 * 180 / math.pi)}º => penalty = {round(radial_delta_penalty, 2)}")
                 print(f"\tscore: {score}")
 
+            dcenter0 = util.distance(c0.v, self.centroid)
+            dcenter1 = util.distance(c1.v, self.centroid)
+            dcenter_delta = abs(dcenter0 - dcenter1)/max(dcenter0, dcenter1)
+            score += 0.1 * dcenter_delta
+
             # we also want them opening up toward each other
             # (the rays that shoot out should be about 180 degrees apart)
             orientation_delta = abs(c0.midangle - c1.midangle)
@@ -427,31 +447,63 @@ class Vector(object):
                 print(f"\torientation_delta: {round(orientation_delta * 180 / math.pi)}º, d180: {round(d180_deg)}º => penalty = {round(orientation_penalty, 2)}")
                 print(f"\tFinal score: {score}\n")
 
-            return [c0, c1], score
+            return (c0, c1, score)
+
+        def _score_4_candidates(pair0, pair1):
+            c0, c1, s01 = pair0
+            c2, c3, s23 = pair1
+            score = s01 + s23
+
+            ys = [c.v[1] for c in [c0, c1, c2, c3]]
+            debug = 1 in ys and 9 in ys and 88 in ys and (90 in ys or 53 in ys)
+            if debug:
+                print("==========")
+                for c in [c0, c1, c2, c3]:
+                    print(f" - {c.v}")
+                print(f"Base Score: {score}")
+
+            # sort the angles by order of radial position around the centroid
+            cs = sorted([c0, c1, c2, c3], key=lambda c: util.angle_between(self.centroid, c.v))
+
+            # penalize if the corners are not evenly spread out
+            # we want the corners to be roughly 90º radially around the center from each other
+            angles = [util.angle_between(self.centroid, c.v) for c in cs]
+
+            if debug:
+                for i in range(4):
+                    print(f" \t [{i}] {round(angles[i] * 180 / math.pi)}° for {cs[i]}")
+            delta_angle_01 = util.compare_angles(angles[0], angles[1])
+            delta_angle_12 = util.compare_angles(angles[1], angles[2])
+            delta_angle_23 = util.compare_angles(angles[2], angles[3])
+            delta_angle_30 = util.compare_angles(angles[3], angles[0])
+            if debug:
+                print(f" \t   Deltas: {round(delta_angle_01 * 180 / math.pi)}°, {round(delta_angle_12 * 180 / math.pi)}°, {round(delta_angle_23 * 180 / math.pi)}°, {round(delta_angle_30 * 180 / math.pi)}°")
+            score_01 = 0.3 * abs(delta_angle_01 - math.pi/2)
+            score_12 = 0.3 * abs(delta_angle_12 - math.pi/2)
+            score_23 = 0.3 * abs(delta_angle_23 - math.pi/2)
+            score_30 = 0.3 * abs(delta_angle_30 - math.pi/2)
+            if debug:
+                print(f" \t   Penalties: {round(score_01, 2)}, {round(score_12, 2)}, {round(score_23, 2)}, {round(score_30, 2)}")
+            score += score_01 + score_12 + score_23 + score_30
+            if debug:
+                print(f"\t Score: {score}")
+
+            cs.append(score)
+            return cs
 
         # Generate all pair combos and score them each up as proposed diagonal corners
         all_pairs = list(itertools.combinations(candidates, 2))
-        all_pair_scores = sorted([_score_2_candidates(c0, c1) for (c0, c1) in all_pairs], key=lambda c: c[1])
+        all_pair_scores = sorted([_score_2_candidates(c0, c1) for (c0, c1) in all_pairs], key=lambda r: r[2])
 
-        # pluck off candidates as they are claimed by top pairs
-        paired_candidates = {}
-        for (c0, c1), score in all_pair_scores:
-            if c0 in paired_candidates or c1 in paired_candidates:
-                continue
-            paired_candidates[c0] = (c0, c1, score)
-            paired_candidates[c1] = (c0, c1, score)
+        # sort so we have a list of pairs, lowest (best) score first
+        all_pair_scores = sorted(all_pair_scores, key=lambda c: c[2])
+        all_pair_scores = all_pair_scores[:30]  # only consider the best n pairs to save on compute
 
-        # sort so we have a list of pairs, lowest score first
-        by_score = sorted(set(paired_candidates.values()), key=lambda c: c[2])
+        # compare pairs of pairs to see how well they work
+        all_pair_pairs = list(itertools.combinations(all_pair_scores, 2))
+        all_pair_pair_scores = sorted([_score_4_candidates(pair0, pair1) for (pair0, pair1) in all_pair_pairs], key=lambda c: c[4])
 
-        # todo - compare pairs of pairs to find the best set of 4 corners
-        # for now, I'm seeing how well the top 2 pairs work
-        best_pair = by_score[0]
-        next_best_pair = by_score[1]
-        self.selected_candidates = [best_pair[0], best_pair[1], next_best_pair[0], next_best_pair[1]]
-        # resort in order of radial-location around the center
-        self.selected_candidates = sorted(self.selected_candidates, key=lambda c: util.angle_between(self.centroid, c.v))
-
+        self.selected_candidates = all_pair_pair_scores[0][0:4]
         self.corners = [c.v for c in self.selected_candidates]
         self.corner_indices = [c.i for c in self.selected_candidates]
 
@@ -470,7 +522,7 @@ class Vector(object):
             vertices = util.slice(self.vertices, c_i, c_j)
 
             # do a bit of simplification
-            vertices = util.ramer_douglas_peucker(vertices, epsilon=0.25)
+            vertices = util.ramer_douglas_peucker(vertices, epsilon=0.05)
             self.merge_close_points(vertices, threshold=MERGE_IF_CLOSER_THAN_PX)
 
             # make sure to include the true endpoints
@@ -482,7 +534,7 @@ class Vector(object):
             # edges are flat and thus have very little variance from the average line between all points
             corner_corner_distance = util.distance(vertices[0], vertices[-1])
             polyline_length = util.polyline_length(vertices)
-            is_edge = polyline_length / corner_corner_distance < 1.1
+            is_edge = polyline_length / corner_corner_distance < 1.07
 
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
@@ -501,15 +553,6 @@ class Vector(object):
         # make sure that sides 0 and 1 are roughly at a right angle
         if abs(self.sides[1].angle - self.sides[0].angle - 90 * math.pi/180.0) >  SIDES_ORTHOGONAL_THRESHOLD_DEG:
             raise Exception(f"Expected sides 0 and 1 to be at a right angle, but they are not ({self.sides[1].angle} - {self.sides[0].angle})")
-
-        lengths = [s.length for s in self.sides]
-        avg02 = (lengths[0] + lengths[2])/2
-        avg13 = (lengths[1] + lengths[3])/2
-        len_ratio02 = abs(lengths[0] - lengths[2])/avg02
-        len_ratio13 = abs(lengths[1] - lengths[3])/avg13
-        if len_ratio02 > 0.55 or len_ratio13 > 0.55:
-            print(f"Lengths: {lengths}; ratios: {len_ratio02}, {len_ratio13}")
-            raise Exception(f"Expected sides to be roughly the same length, but they are not ({len_ratio02}, {len_ratio13})")
 
         d02 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
         d13 = util.distance_between_segments(self.sides[0].segment, self.sides[2].segment)
