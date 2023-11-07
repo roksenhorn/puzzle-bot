@@ -53,19 +53,19 @@ class Side(object):
         """
         Returns None if no match, or a float representing the similarity of the two sides (1.0 = perfect) if they generally match
         """
-        if render and debug_str:
-            print(debug_str)
+        # if render and debug_str:
+        #     print(debug_str)
 
         if self.is_edge or side.is_edge:
-            if render:
-                print("\tNO MATCH: one is an edge!!!!!!!!!!")
+            # if render:
+            #     print("\tNO MATCH: one is an edge!!!!!!!!!!")
             return 1000
 
         # sides must be roughly the same length
         d_scale = 1.0 - (self.v_length / side.v_length)
         if abs(d_scale) > SIDE_MAX_LENGTH_DISCREPANCY:
-            if render:
-                print(f"\tNO MATCH: scale is too different!!!!!!!!!! {d_scale}")
+            # if render:
+            #     print(f"\tNO MATCH: scale is too different!!!!!!!!!! {d_scale}")
             return 1000
 
         polyline1 = self.vertices
@@ -77,6 +77,7 @@ class Side(object):
         error, shift = util.error_between_polylines(polyline1, polyline2, p1_len=side.v_length)
 
         if render and debug_str and error <= SIDE_MAX_ERROR_TO_MATCH:
+            print(debug_str)
             shifted0 = [(x - shift[0], y - shift[1]) for x, y in polyline1]
             print(f"\t ==> Error = {error}, shift: {shift}")
             util.render_polylines([shifted0, polyline2])
