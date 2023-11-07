@@ -4,8 +4,8 @@ from typing import List, Tuple
 from common import util
 
 
-# Two sides from different pieces "fit" if they are within this threshold (1.0 = perfect)
-SIDE_MAX_ERROR_TO_MATCH = 0.70
+# Two sides from different pieces "fit" if they are within this threshold (0.0 = perfect)
+SIDE_MAX_ERROR_TO_MATCH = 1.20
 
 # sides must be within this multiple of each other's polyline length
 SIDE_MAX_LENGTH_DISCREPANCY = 0.08

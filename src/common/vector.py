@@ -30,11 +30,63 @@ SCALAR = 5.0
 
 
 class Candidate(object):
-    def __init__(self, v, i, centroid, corner_angle=10000, offset_from_center=10000, stdev=10000, midangle=10000):
+    @staticmethod
+    def from_vertex(vertices, i, centroid, debug=False):
+        i = i % len(vertices)
+        v_i = vertices[i]
+
+        # find the angle from i to the points before it (h), and i to the points after (j)
+        vec_offset = round(1 / SCALAR)  # we start comparing to this many points away, as really short vectors have noisy angles
+        vec_len_for_stdev = round(14 * SCALAR)  # compare this many total points to see the curvature
+        vec_len_for_angle = round(6 * SCALAR)  # compare this many total points to see the width of the angle of this corner
+
+        # see how straight the spokes are from this point, and what angle they jut out at
+        _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
+        _, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_stdev+vec_offset))
+        stdev = stdev_h + stdev_j
+
+        a_ih, _ = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_angle-vec_offset, i-vec_offset-1))
+        a_ij, _ = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_angle+vec_offset))
+
+        # extend out along the avg spoke direction
+        p_h = (v_i[0] + 10 * math.cos(a_ih), v_i[1] + 10 * math.sin(a_ih))
+        p_j = (v_i[0] + 10 * math.cos(a_ij), v_i[1] + 10 * math.sin(a_ij))
+
+        # how wide is the angle between the two legs?
+        angle_hij = util.counterclockwise_angle_between_vectors(p_h, v_i, p_j)
+
+        a_ic = util.angle_between(v_i, centroid)
+        midangle = util.angle_between(v_i, util.midpoint(p_h, p_j))
+        offset_from_center = util.compare_angles(midangle, a_ic)
+
+        is_pointed_toward_center = offset_from_center < angle_hij / 2
+        is_valid_width = angle_hij >= CORNER_MIN_ANGLE_DEG * math.pi/180 and angle_hij <= CORNER_MAX_ANGLE_DEG * math.pi/180
+
+        if debug:
+            print(f"\n\n\n!!!!!!!!!!!!!! {v_i} !!!!!!!!!!!!!!!\n")
+            print(f"stdev of spokes: {stdev} = {stdev_h} + {stdev_j}, {vec_len_for_stdev}px out")
+            print(f"v: {v_i}, c: {centroid} => {round(a_ic * 180 / math.pi)}°")
+            print(f"width: {round(angle_hij * 180 / math.pi)}°, mid-angle ray: {round(midangle * 180 / math.pi)}°")
+            print(f"a_ih: {round(a_ih * 180 / math.pi)}°, a_ij: {round(a_ij * 180 / math.pi)}°")
+            print(f"a_ic: {round(a_ic * 180 / math.pi)}°, offset: {round(offset_from_center * 180 / math.pi)}°")
+            print(f"angle_hij: {round(angle_hij * 180 / math.pi)}°, is_pointed_toward_center: {is_pointed_toward_center}, is valid width: {is_valid_width}")
+
+        if not is_pointed_toward_center or not is_valid_width:
+            if debug:
+                print(">>>>>> Skipping; not a valid candidate")
+            return None
+
+        candidate = Candidate(v=v_i, i=i, centroid=centroid, angular_width=angle_hij, offset_from_center=offset_from_center, midangle=midangle, stdev=stdev)
+        if debug:
+            print(candidate)
+
+        return candidate
+
+    def __init__(self, v, i, centroid, angular_width=10000, offset_from_center=10000, stdev=10000, midangle=10000):
         self.v = v
         self.i = i
         self.centroid = centroid
-        self.angle = corner_angle
+        self.angle = angular_width
         self.stdev = stdev
         self.offset_from_center = offset_from_center
         self.midangle = midangle
@@ -49,7 +101,7 @@ class Candidate(object):
         # how much bigger are we than 90º?
         # If we're less, then we're more likely to be a corner so we don't penalize for below 90º
         angle_error = max(0, self.angle - math.pi/2)
-        score = (1.0 * angle_error) + (0.4 * self.offset_from_center) + (2.5 * self.stdev)
+        score = (1.0 * angle_error) + (0.2 * self.offset_from_center) + (1.5 * self.stdev)
         return score
 
     def __repr__(self) -> str:
@@ -227,7 +279,7 @@ class Vector(object):
 
     def find_four_corners(self):
         candidates = self.find_corner_candidates()
-        candidates = self.nudge_to_angular_corners(candidates)
+        candidates = self.merge_nearby_candidates(candidates)
         self.select_best_corners(candidates)
 
         if len(self.corners) != 4:
@@ -235,156 +287,43 @@ class Vector(object):
 
     def find_corner_candidates(self):
         """
-        Finds corners by finding places that are the intersection of two straight spokes
+        Finds corners by evaluating the score at each each point
         """
-        vertices = self.vertices
         candidates = []
 
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
-        for i in range(len(vertices)):
-            p_i = vertices[i]
-            debug =(p_i[0] < 200 and p_i[1] == 30)
-            if debug:
-                print(f"\n\n\n!!!!!!!!!!!!!! {p_i} !!!!!!!!!!!!!!!\n\n\n")
-
-            # find the angle from i to the points before it (h), and i to the points after (j)
-            vec_offset = 1  # we start comparing to this many points away, as really short vectors have noisy angles
-            vec_len = round(10 * SCALAR)  # compare this many total points
-            a_ih, stdev_h = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1), debug=False)
-            a_ij, stdev_j = util.colinearity(from_point=p_i, to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset), debug=False)
-            stdev = stdev_h + stdev_j
-            if debug:
-                print(f"stdev of spokes: {stdev} = {stdev_h} + {stdev_j}, {vec_len}px out")
-            if stdev > 0.30:
+        for i in range(len(self.vertices)):
+            debug = self.vertices[i][1] == 3920
+            candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
+            if not candidate or candidate.score() > 1.5:
                 if debug:
-                    print("not straight enough - eliminating")
+                    print(">>>>>> Skipping; score too high")
                 continue
-
-            if debug:
-                print(f"a_ih: {round(a_ih * 180/math.pi)} stdev_h: {stdev_h}")
-                print(f"a_ij: {round(a_ij * 180/math.pi)} stdev_j: {stdev_j}")
-                print(util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
-                print(util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
-
-            # go out on the spokes
-            p_h = (p_i[0] + 10 * math.cos(a_ih) * SCALAR, p_i[1] + 10 * math.sin(a_ih) * SCALAR)
-            p_j = (p_i[0] + 10 * math.cos(a_ij) * SCALAR, p_i[1] + 10 * math.sin(a_ij) * SCALAR)
-
-            # how wide is the angle between the two legs?
-            angle_hij = util.counterclockwise_angle_between_vectors(p_h, p_i, p_j)
-
-            # See if the delta between the two legs is roughly 90º
-            is_wide_enough = angle_hij > CORNER_MIN_ANGLE_DEG * math.pi/180
-            is_narrow_enough = angle_hij < CORNER_MAX_ANGLE_DEG * math.pi/180
-            if not is_wide_enough or not is_narrow_enough:
-                if debug:
-                    print(f"!!! not roughly 90º: {round(angle_hij * 180/math.pi)} is too far from 90º")
-                continue
-
-            # corners generally open up toward the center of the piece
-            # meaning the mid-angle that comes out of the corner is roughly the same as the angle from the corner to the center
-            angle_ih = util.angle_between(p_i, p_h)
-            a_ic = util.angle_between(p_i, self.centroid)
-            opens_toward_angle = util.angle_between(p_i, util.midpoint(p_h, p_j))
-            offset_from_center = util.compare_angles(opens_toward_angle, a_ic)
-            is_pointed_toward_center = offset_from_center < angle_hij / 2
-
-            is_corner = is_wide_enough and is_narrow_enough and is_pointed_toward_center
-            if is_corner:
-                candidate = Candidate(v=p_i, i=i, centroid=self.centroid, corner_angle=angle_hij, offset_from_center=offset_from_center)
-                candidates.append(candidate)
-                if debug:
-                    print(f"Found a candidate!")
-                    print(f"\tspoke stdev: {stdev} = {stdev_h} + {stdev_j}, {vec_len}px out")
-                    print(candidate)
-            elif debug:
-                print(f"NOT a possible corner at {i}: {p_i} w/ {stdev}")
-                print(f"\t c={self.centroid} \t ih={round(angle_ih * 180 / math.pi)} \t ic={round(a_ic * 180 / math.pi)} \t ij={round(a_ij * 180 / math.pi)} \t offset={round(offset_from_center * 180 / math.pi)}")
-                print(f"\t angle width: {round(angle_hij * 180 / math.pi)}")
-                print(f"\t roughly 90? {is_wide_enough} && {is_narrow_enough} \t toward center? {is_pointed_toward_center} \t open toward {round(opens_toward_angle * 180 / math.pi)} \t offset from center {round(offset_from_center * 180 / math.pi)}\n")
+            candidates.append(candidate)
 
         return candidates
 
-    def nudge_to_angular_corners(self, candidates):
+    def merge_nearby_candidates(self, candidates):
         """
-        Sometimes the local maxima is not at the corner of two spokes, but rather just along one of the spokes
-        Let's nudge it to the best corner vertex and compute the angle that this corner represents
+        If candidates are within a few indices of each other, merge them by choosing the one with the lowest score
         """
+        cs_by_i = sorted(candidates, key=lambda c: c.i)
+        j = 0
+        while j + 1 < len(cs_by_i):
+            c0 = cs_by_i[j]
+            c1 = cs_by_i[j + 1]
 
-        # eliminate duplicates
-        candidates = list(set(candidates))
-
-        # Look a few before and a few after to see if a nearby vertex is a better corner candidate
-        refined_candidates = []
-        visited = set()
-        for candidate in candidates:
-            debug = (candidate.v[1] == -807)
-            if debug:
-                print(candidate)
-
-            if candidate.i in visited:
-                # there was another nearby corner that we searched around, so drop this one
-                continue
-
-            subcandidates = []
-            for j in range(-2, 3):
-                angle, offset_from_center, midangle, is_pointed_toward_center, stdev = self.compute_angle_and_stdev(self.vertices, candidate.i + j)
-                if not is_pointed_toward_center:
-                    continue
-
-                i = (candidate.i + j) % len(self.vertices)
-                subcandidate = Candidate(v=self.vertices[i], i=i, centroid=self.centroid, corner_angle=angle, offset_from_center=offset_from_center, midangle=midangle, stdev=stdev)
-                if debug:
-                    v = self.vertices[i]
-                    print(f"\t{j}:    ({v[0]}, {v[1]}) \t {subcandidate}")
-
-                visited.add(i)
-                subcandidates.append(subcandidate)
-
-            # pick the best subcandidate
-            best = min(subcandidates, key=lambda c: c.score())
-            if debug:
-                print("Best: " + str(best))
-            refined_candidates.append(best)
-
-        return refined_candidates
-
-    def compute_angle_and_stdev(self, vertices, i):
-        i = i % len(self.vertices)
-        v_i = self.vertices[i]
-        debug = (v_i == (34, -1))
-        if debug:
-            print(v_i)
-
-        # find the angle from i to the points before it (h), and i to the points after (j)
-        vec_offset = round(1 / SCALAR)  # we start comparing to this many points away, as really short vectors have noisy angles
-        vec_len = round(12 * SCALAR)  # compare this many total points
-
-        # see how straight the spokes are from this point, and what angle they jut out at
-        a_ih, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len-vec_offset, i-vec_offset-1))
-        a_ij, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len+vec_offset))
-
-        # extend out along the avg spoke direction
-        p_h = (v_i[0] + 10 * math.cos(a_ih) * SCALAR, v_i[1] + 10 * math.sin(a_ih) * SCALAR)
-        p_j = (v_i[0] + 10 * math.cos(a_ij) * SCALAR, v_i[1] + 10 * math.sin(a_ij) * SCALAR)
-
-        # how wide is the angle between the two legs?
-        angle_hij = util.counterclockwise_angle_between_vectors(p_h, v_i, p_j)
-
-        a_ic = util.angle_between(v_i, self.centroid)
-        opens_toward_angle = util.angle_between(v_i, util.midpoint(p_h, p_j))
-        offset_from_center = util.compare_angles(opens_toward_angle, a_ic)
-
-        is_pointed_toward_center = offset_from_center < angle_hij / 2
-
-        if debug:
-            print(f"v: {v_i}, c: {self.centroid} => {round(a_ic * 180 / math.pi)}°")
-            print(f"width: {round(angle_hij * 180 / math.pi)}°, ray out center of this angle: {round(opens_toward_angle * 180 / math.pi)}°")
-            print(f"a_ih: {round(a_ih * 180 / math.pi)}°, a_ij: {round(a_ij * 180 / math.pi)}°")
-            print(f"a_ic: {round(a_ic * 180 / math.pi)}°, offset: {round(offset_from_center * 180 / math.pi)}°")
-
-        return angle_hij, offset_from_center, opens_toward_angle, is_pointed_toward_center, (stdev_h + stdev_j)/2
+            # if the two corners are close together, pick the one with the lower score
+            # then fast forward past this second candidate
+            if c1.i - c0.i <= 2 * SCALAR:
+                if c0.score() < c1.score():
+                    cs_by_i.remove(c1)
+                else:
+                    cs_by_i.remove(c0)
+            else:
+                j += 1
+        return cs_by_i
 
     def select_best_corners(self, candidates):
         """
@@ -401,8 +340,8 @@ class Vector(object):
         # compute each corner's score, and only consider the n best corners
         candidates = sorted(candidates, key=lambda c: c.score())[:12]
 
-        for c in candidates:
-            print(c)
+        # for c in candidates:
+        #     print(c)
 
         def _score_2_candidates(c0, c1):
             """
@@ -456,27 +395,20 @@ class Vector(object):
             c2, c3, s23 = pair1
             score = s01 + s23
 
-            ys = [c.v[1] for c in [c0, c1, c2, c3]]
-            debug = 1 in ys and 9 in ys and 88 in ys and (90 in ys or 53 in ys)
-            if debug:
-                print("==========")
-                for c in [c0, c1, c2, c3]:
-                    print(f" - {c.v}")
-                print(f"Base Score: {score}")
-
             # sort the angles by order of radial position around the centroid
             cs = sorted([c0, c1, c2, c3], key=lambda c: util.angle_between(self.centroid, c.v))
+
+            ys = [c.v[1] for c in [c0, c1, c2, c3]]
+            debug = 27 in ys and 8 in ys and 4420 in ys
+            if debug:
+                print("==========")
+                for c in cs:
+                    print(f" - {c.v}")
+                print(f"Base Score: {score}")
 
             # penalize if the corners are not evenly spread out
             # we want the corners to be roughly 90º radially around the center from each other
             angles = [util.angle_between(self.centroid, c.v) for c in cs]
-
-            dists = [util.distance(cs[i].v, cs[(i + 1) % 4].v) for i in range(4)]
-            min_dist = min(dists)
-            if min(dists) < 15 * SCALAR:
-                score += 20.0
-                if debug:
-                    print(f" \t   Penalty: {round(1.0, 2)} for being too close to each other")
 
             if debug:
                 for i in range(4):
@@ -496,6 +428,12 @@ class Vector(object):
             score += score_01 + score_12 + score_23 + score_30
             if debug:
                 print(f"\t Score: {score}")
+
+            min_delta = min([delta_angle_01, delta_angle_12, delta_angle_23, delta_angle_30])
+            if min_delta < 10 * math.pi/180:
+                score += 1.0 / (min_delta + 0.01)
+                if debug:
+                    print(f"\t Score after tight min-delta: {score}")
 
             cs.append(score)
             return cs
