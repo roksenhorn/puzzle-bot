@@ -37,8 +37,8 @@ class Orientation(object):
 
 # dimensions for the puzzle you're solving
 # TODO: this should either be automatically deduced or taken in as config
-WIDTH = 40
-HEIGHT = 25
+WIDTH = 30
+HEIGHT = 6
 
 
 class Board(object):
@@ -176,8 +176,6 @@ def build(input_path, output_path):
             for other_piece_id, other_side_id, error in fits[i]:
                 ps[piece_id][i].append((other_piece_id, other_side_id, error))
 
-    board = Board(width=WIDTH, height=HEIGHT)
-
     corners = []
     edges = []
     edge_length = 2 * (WIDTH + HEIGHT) - 4
@@ -194,9 +192,26 @@ def build(input_path, output_path):
     if len(edges) != edge_length:
         raise Exception(f"Expected {edge_length} pieces on the edge, got {len(edges)}")
 
-    start_piece_id = corners[0]
+    success = False
+    for i in range(0, 4):
+        try:
+            build_from_corner(ps, start_piece_id=corners[i])
+        except Exception as e:
+            print(f"Failed to build from corner {i}: {e}")
+            continue
+        success = True
+        break
+
+    if success:
+        print("SUCCESS!")
+    else:
+        raise Exception("Failed to solve")
+
+def build_from_corner(ps, start_piece_id):
+    print(f"\n===============================\nBuilding from corner {start_piece_id}...")
     start_piece_fits = ps[start_piece_id]
     start_orientation = _orient_start_corner_to_top_left(start_piece_fits)
+    board = Board(width=WIDTH, height=HEIGHT)
 
     x, y = (0, 0)
     board.place(start_piece_id, start_piece_fits, x, y, start_orientation)
@@ -214,7 +229,7 @@ def build(input_path, output_path):
         priority, data = heapq.heappop(priority_q)
         board, start_piece_id, start_orientation, x, y, direction = data
         # print(f"({x}, {y}) moving {direction}")
-        if iteration % 1000 == 0:
+        if iteration % 1000 == 0 or True:
             print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
 
