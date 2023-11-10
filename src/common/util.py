@@ -494,6 +494,7 @@ def find_islands(grid):
                             if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
                                 queue.append((x + dx, y + dy))
                 islands.append(island)
+                print(f"\t > {len(island)} pixels in island {len(islands)}")
     return islands
 
 

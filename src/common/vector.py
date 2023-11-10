@@ -37,8 +37,8 @@ class Candidate(object):
 
         # find the angle from i to the points before it (h), and i to the points after (j)
         vec_offset = round(1 / SCALAR)  # we start comparing to this many points away, as really short vectors have noisy angles
-        vec_len_for_stdev = round(14 * SCALAR)  # compare this many total points to see the curvature
-        vec_len_for_angle = round(6 * SCALAR)  # compare this many total points to see the width of the angle of this corner
+        vec_len_for_stdev = round(15 * SCALAR)  # compare this many total points to see the curvature
+        vec_len_for_angle = round(7 * SCALAR)  # compare this many total points to see the width of the angle of this corner
 
         # see how straight the spokes are from this point, and what angle they jut out at
         _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
@@ -101,7 +101,7 @@ class Candidate(object):
         # how much bigger are we than 90º?
         # If we're less, then we're more likely to be a corner so we don't penalize for below 90º
         angle_error = max(0, self.angle - math.pi/2)
-        score = (1.0 * angle_error) + (0.2 * self.offset_from_center) + (1.5 * self.stdev)
+        score = (0.7 * angle_error) + (0.4 * self.offset_from_center) + (1.7 * self.stdev)
         return score
 
     def __repr__(self) -> str:
@@ -481,7 +481,8 @@ class Vector(object):
             # edges are flat and thus have very little variance from the average line between all points
             corner_corner_distance = util.distance(vertices[0], vertices[-1])
             polyline_length = util.polyline_length(vertices)
-            is_edge = polyline_length / corner_corner_distance < 1.07
+            is_edge = polyline_length / corner_corner_distance < 1.04
+            print(f"Corner-corner distance: {round(corner_corner_distance, 3)}, polyline length: {round(polyline_length, 3)}, is_edge: {is_edge}")
 
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
