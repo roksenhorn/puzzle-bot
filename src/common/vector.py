@@ -158,8 +158,9 @@ class Vector(object):
         svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
         svg += f'<svg width="{3 * self.width}" height="{3 * self.height}" viewBox="-10 -10 {20 + self.width} {20 + self.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
         for i, side in enumerate(self.sides):
+            stroke_width = 3.0 if side.is_edge else 1.0
             pts = ' '.join([','.join([str(e) for e in v]) for v in side.vertices])
-            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:1.0" />'
+            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:{stroke_width}" />'
         # draw in a small circle for each corner (the first and last vertex for each side)
         for i, side in enumerate(self.sides):
             v = side.vertices[0]
@@ -482,8 +483,6 @@ class Vector(object):
             corner_corner_distance = util.distance(vertices[0], vertices[-1])
             polyline_length = util.polyline_length(vertices)
             is_edge = polyline_length / corner_corner_distance < 1.04
-            print(f"Corner-corner distance: {round(corner_corner_distance, 3)}, polyline length: {round(polyline_length, 3)}, is_edge: {is_edge}")
-
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
 

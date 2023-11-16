@@ -13,22 +13,17 @@ def extract_pieces(input_path, n, output_path=None):
     print(f"Loading {input_path.split('/')[-1]}...")
     pixels, _, _ = util.load_binary_image(input_path)
 
+    def save_island(island, i):
+        return extract_piece(i + 1, island, output_path)
+
     print(f"Finding islands...")
-    islands = util.find_islands(pixels)
-
-    # sort islands (which is a list of list) by len of each island
-    islands.sort(key=lambda i: len(i), reverse=True)
-    found_count = 0
-    for i, island in enumerate(islands):
-        print(f"[{i + 1}] Island with {len(island)} pixels")
-        if extract_piece(i + 1, island, output_path):
-            found_count += 1
-
-        if found_count == n:
-            break
+    util.find_islands(pixels, callback=save_island)
 
 
 def extract_piece(piece_id, piece_coordinates, output_path=None):
+    if len(piece_coordinates) < 100:
+        return False
+
     BORDER_WIDTH_PX = 1
     xs = [x for (x, _) in piece_coordinates]
     ys = [y for (_, y) in piece_coordinates]
@@ -37,7 +32,7 @@ def extract_piece(piece_id, piece_coordinates, output_path=None):
     height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
     print(f"{width} x {height}")
 
-    if width < 0.4 * height or height < 0.4 * width:
+    if width < 0.3 * height or height < 0.3 * width:
         print(f"Skipping piece {piece_id} because it is too thin")
         return False
 

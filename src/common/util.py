@@ -477,7 +477,7 @@ def sublist_exists(lst, sub_lst):
     return sub_lst_str in lst_extended_str
 
 
-def find_islands(grid):
+def find_islands(grid, callback=None):
     visited = set()
     islands = []
     for i in range(len(grid)):
@@ -493,8 +493,15 @@ def find_islands(grid):
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                             if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
                                 queue.append((x + dx, y + dy))
-                islands.append(island)
+
                 print(f"\t > {len(island)} pixels in island {len(islands)}")
+                if callback:
+                    ok = callback(island, len(islands))
+                    if ok:
+                        islands.append(True)
+                else:
+                    islands.append(island)
+    print(f"Found {len(islands)} islands")
     return islands
 
 

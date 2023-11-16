@@ -81,6 +81,9 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
         piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * 3.0]
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
+        if len(piece.fits[si]) > 5:
+            fifth_match_error = piece.fits[si][4][2]
+            print(f"\t1st match error: {least_error} \t ==> 5th match error: {fifth_match_error} \t ==> ratio: {fifth_match_error / least_error}")
 
     return (piece_id, piece)
 
