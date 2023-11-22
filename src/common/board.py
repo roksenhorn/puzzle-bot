@@ -36,9 +36,9 @@ class Orientation(object):
     ZERO_POINTS_LEFT = 3
 
 # dimensions for the puzzle you're solving
-# TODO: this should either be automatically deduced or taken in as config
+# TODO: this should be taken in as config
 WIDTH = 40
-HEIGHT = 12
+HEIGHT = 25
 
 
 class Board(object):

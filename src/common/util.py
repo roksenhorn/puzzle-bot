@@ -486,10 +486,10 @@ def find_islands(grid, callback=None):
             if grid[i][j] == 1 and (i, j) not in visited1 and (i, j) not in visited2:
                 island = set()
                 queue = [(i, j)]
-                if len(islands) % 120 == 0:
+                if len(islands) % 160 == 0:
                     visited1 = set()
                     print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
-                if len(islands) % 120 == 60:
+                if len(islands) % 160 == 80:
                     visited2 = set()
                     print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
                 while queue:

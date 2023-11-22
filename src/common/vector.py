@@ -37,8 +37,8 @@ class Candidate(object):
 
         # find the angle from i to the points before it (h), and i to the points after (j)
         vec_offset = round(1 / SCALAR)  # we start comparing to this many points away, as really short vectors have noisy angles
-        vec_len_for_stdev = round(15 * SCALAR)  # compare this many total points to see the curvature
-        vec_len_for_angle = round(7 * SCALAR)  # compare this many total points to see the width of the angle of this corner
+        vec_len_for_stdev = round(11 * SCALAR)  # compare this many total points to see the curvature
+        vec_len_for_angle = round(4 * SCALAR)  # compare this many total points to see the width of the angle of this corner
 
         # see how straight the spokes are from this point, and what angle they jut out at
         _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
@@ -59,7 +59,7 @@ class Candidate(object):
         midangle = util.angle_between(v_i, util.midpoint(p_h, p_j))
         offset_from_center = util.compare_angles(midangle, a_ic)
 
-        is_pointed_toward_center = offset_from_center < angle_hij / 2
+        is_pointed_toward_center = offset_from_center < angle_hij / 2 or abs(offset_from_center) <= (55 * math.pi/180)
         is_valid_width = angle_hij >= CORNER_MIN_ANGLE_DEG * math.pi/180 and angle_hij <= CORNER_MAX_ANGLE_DEG * math.pi/180
 
         if debug:
@@ -101,7 +101,7 @@ class Candidate(object):
         # how much bigger are we than 90º?
         # If we're less, then we're more likely to be a corner so we don't penalize for below 90º
         angle_error = max(0, self.angle - math.pi/2)
-        score = (0.7 * angle_error) + (0.4 * self.offset_from_center) + (1.7 * self.stdev)
+        score = (0.7 * angle_error) + (0.4 * self.offset_from_center) + (13.0 * (self.stdev ** 2))
         return score
 
     def __repr__(self) -> str:
@@ -295,11 +295,11 @@ class Vector(object):
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(self.vertices)):
-            debug = self.vertices[i][1] == 3920
+            debug = self.vertices[i][1] == 850
             candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
-            if not candidate or candidate.score() > 1.5:
+            if not candidate or candidate.score() > 2.5:
                 if debug:
-                    print(">>>>>> Skipping; score too high")
+                    print(f">>>>>> Skipping; score too high: {candidate.score() if candidate else 0.0}")
                 continue
             candidates.append(candidate)
 
@@ -343,6 +343,9 @@ class Vector(object):
 
         # for c in candidates:
         #     print(c)
+
+        if len(candidates) < 4:
+            raise Exception(f"Expected at least 4 candidates, found {len(candidates)} on piece {self.id}")
 
         def _score_2_candidates(c0, c1):
             """
