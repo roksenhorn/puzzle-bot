@@ -4,9 +4,12 @@ Processes the image by removing dust and hairs, then crops tightly leaving a 1px
 """
 import argparse
 import os
-from PIL import Image
+import PIL
 
 from common import util
+
+
+PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 
 def extract_pieces(input_path, n, output_path=None):
@@ -17,7 +20,9 @@ def extract_pieces(input_path, n, output_path=None):
         return extract_piece(i + 1, island, output_path)
 
     print(f"Finding islands...")
-    util.find_islands(pixels, callback=save_island)
+    islands = util.find_islands(pixels, callback=save_island)
+    if len(islands) != n:
+        raise Exception(f"Expected {n} pieces but found {len(islands)}")
 
 
 def extract_piece(piece_id, piece_coordinates, output_path=None):
@@ -48,7 +53,7 @@ def extract_piece(piece_id, piece_coordinates, output_path=None):
         pixels[yy][xx] = 1
 
     if output_path:
-        img = Image.new('1', (width, height))
+        img = PIL.Image.new('1', (width, height))
         img.putdata([pixel for row in pixels for pixel in row])
         img.save(os.path.join(output_path, f'{piece_id}.bmp'))
 

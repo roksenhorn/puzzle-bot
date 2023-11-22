@@ -478,17 +478,25 @@ def sublist_exists(lst, sub_lst):
 
 
 def find_islands(grid, callback=None):
-    visited = set()
+    visited1 = set()
+    visited2 = set()
     islands = []
     for i in range(len(grid)):
         for j in range(len(grid[i])):
-            if grid[i][j] == 1 and (i, j) not in visited:
+            if grid[i][j] == 1 and (i, j) not in visited1 and (i, j) not in visited2:
                 island = set()
                 queue = [(i, j)]
+                if len(islands) % 120 == 0:
+                    visited1 = set()
+                    print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
+                if len(islands) % 120 == 60:
+                    visited2 = set()
+                    print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
                 while queue:
                     x, y = queue.pop(0)
-                    if (x, y) not in visited:
-                        visited.add((x, y))
+                    if (x, y) not in visited1 and (x, y) not in visited2:
+                        visited1.add((x, y))
+                        visited2.add((x, y))
                         island.add((y, x))
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                             if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
