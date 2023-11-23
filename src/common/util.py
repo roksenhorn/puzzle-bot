@@ -163,9 +163,9 @@ def slice(l: List, i: int, j: int) -> List:
         i += len(l)
     if j < 0:
         j += len(l)
-    while i > len(l):
+    while i >= len(l):
         i -= len(l)
-    while j > len(l):
+    while j >= len(l):
         j -= len(l)
     if i < j:
         return l[i:j + 1]
@@ -443,6 +443,62 @@ def angular_stdev(angles):
     stdev = np.std(angular_deviations)
 
     return float(stdev)
+
+
+def curve_score(points, debug=False) -> float:
+    """
+    `point` is the point we're checking
+    `points_before` is a list of points that come before `point` in the polyline
+    `points_after` is a list of points that come after `point` in the polyline
+    `centroid` is the centroid of the piece
+    Returns a score of how likely this point is on a curve that opens toward the centroid, rather than a corner
+    e.g. the center of this:
+    after ->    /
+    point ->   *          ==> curve
+    befor ->    \
+
+         |
+         *     => not a curve
+        /
+
+    Returns 0 if it's a corner or even ending outwards, and 1 if it's on a perfect circle
+    """
+    if len(points) < 16:
+        raise Exception("Need a bunch of points to calculate curve score")
+
+    gap = 5
+    angles = [counterclockwise_angle_between_vectors(points[i - gap], points[i], points[i + gap]) for i in range(gap, len(points) - gap)]
+    avg_angle = average_of_angles(angles)
+    angle_deviations = [compare_angles(angle, avg_angle) for angle in angles]
+
+    # sum up the change in angle, weighing them more the closer to the center of the list of points they are
+    # i=0 has 0 weight, i=len-1 has 0 weight, i=len/2 has weight 1.0
+    weighted_deviation = 0.0
+    mid_i = len(angles) // 2
+    denom = 0.0
+    for i, deviation in enumerate(angle_deviations):
+        weight = 1 - abs(i - mid_i) / mid_i
+        weighted_deviation += abs(deviation) * weight
+        denom += weight
+
+    normalized_deviation = weighted_deviation / denom
+    score = 3 * (0.4 - normalized_deviation)
+    score = max(min(1.0, score), 0.0)
+
+    if debug:
+        print(f"Num points: {len(points)}")
+        print(points)
+        print(f"Angle:")
+        for a in angles:
+            print(f"\t{round(a * 180/math.pi)}°")
+        print(f"Angle deviations:")
+        for d in angle_deviations:
+            print(f"\t{round(d * 180/math.pi)}°")
+        print(f"deviation score: {weighted_deviation} / {denom} = {normalized_deviation}")
+        print(f"Curve score: {score}")
+
+    # Aggregate score
+    return score
 
 
 def colinearity(from_point, to_points, debug=False) -> Tuple[float, float]:

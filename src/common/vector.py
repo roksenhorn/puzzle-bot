@@ -26,7 +26,7 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 # scale pixel offsets depending on how big the BMPs are
 # 1.0 is tuned for around 100 pixels wide
-SCALAR = 5.0
+SCALAR = 4.0
 
 
 class Candidate(object):
@@ -35,15 +35,14 @@ class Candidate(object):
         i = i % len(vertices)
         v_i = vertices[i]
 
-        # find the angle from i to the points before it (h), and i to the points after (j)
-        vec_offset = round(1 / SCALAR)  # we start comparing to this many points away, as really short vectors have noisy angles
-        vec_len_for_stdev = round(11 * SCALAR)  # compare this many total points to see the curvature
-        vec_len_for_angle = round(4 * SCALAR)  # compare this many total points to see the width of the angle of this corner
+        if debug:
+            print(f"\n\n\n!!!!!!!!!!!!!! {v_i} !!!!!!!!!!!!!!!\n")
 
-        # see how straight the spokes are from this point, and what angle they jut out at
-        _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
-        _, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_stdev+vec_offset))
-        stdev = stdev_h + stdev_j
+        # find the angle from i to the points before it (h), and i to the points after (j)
+        vec_offset = 1 if SCALAR < 2 else 2    # we start comparing to this many points away, as really short vectors have noisy angles
+        vec_len_for_stdev = round(8 * SCALAR)  # compare this many total points to see the curvature
+        vec_len_for_angle = round(3 * SCALAR)  # compare this many total points to see the width of the angle of this corner
+        vec_len_for_curve = round(9 * SCALAR)  # wrap around these spokes and see if they form a clean curve or not
 
         a_ih, _ = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_angle-vec_offset, i-vec_offset-1))
         a_ij, _ = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_angle+vec_offset))
@@ -60,29 +59,32 @@ class Candidate(object):
         offset_from_center = util.compare_angles(midangle, a_ic)
 
         is_pointed_toward_center = offset_from_center < angle_hij / 2 or abs(offset_from_center) <= (55 * math.pi/180)
-        is_valid_width = angle_hij >= CORNER_MIN_ANGLE_DEG * math.pi/180 and angle_hij <= CORNER_MAX_ANGLE_DEG * math.pi/180
+        is_valid_angle_width = angle_hij >= CORNER_MIN_ANGLE_DEG * math.pi/180 and angle_hij <= CORNER_MAX_ANGLE_DEG * math.pi/180
 
+        if not is_pointed_toward_center or not is_valid_angle_width:
+            if debug:
+                print(">>>>>> Skipping; not a valid candidate")
+            return None
+
+        # see how straight the spokes are from this point, and what angle they jut out at
+        _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
+        _, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_stdev+vec_offset))
+        stdev = stdev_h + stdev_j
+        curve_score = util.curve_score(points=util.slice(vertices, i-vec_len_for_curve, i+vec_len_for_curve), debug=debug)
+
+        candidate = Candidate(v=v_i, i=i, centroid=centroid, angular_width=angle_hij, offset_from_center=offset_from_center, midangle=midangle, stdev=stdev, curve_score=curve_score)
         if debug:
-            print(f"\n\n\n!!!!!!!!!!!!!! {v_i} !!!!!!!!!!!!!!!\n")
             print(f"stdev of spokes: {stdev} = {stdev_h} + {stdev_j}, {vec_len_for_stdev}px out")
             print(f"v: {v_i}, c: {centroid} => {round(a_ic * 180 / math.pi)}°")
             print(f"width: {round(angle_hij * 180 / math.pi)}°, mid-angle ray: {round(midangle * 180 / math.pi)}°")
             print(f"a_ih: {round(a_ih * 180 / math.pi)}°, a_ij: {round(a_ij * 180 / math.pi)}°")
             print(f"a_ic: {round(a_ic * 180 / math.pi)}°, offset: {round(offset_from_center * 180 / math.pi)}°")
-            print(f"angle_hij: {round(angle_hij * 180 / math.pi)}°, is_pointed_toward_center: {is_pointed_toward_center}, is valid width: {is_valid_width}")
-
-        if not is_pointed_toward_center or not is_valid_width:
-            if debug:
-                print(">>>>>> Skipping; not a valid candidate")
-            return None
-
-        candidate = Candidate(v=v_i, i=i, centroid=centroid, angular_width=angle_hij, offset_from_center=offset_from_center, midangle=midangle, stdev=stdev)
-        if debug:
+            print(f"angle_hij: {round(angle_hij * 180 / math.pi)}°, is_pointed_toward_center: {is_pointed_toward_center}, is valid width: {is_valid_angle_width}")
             print(candidate)
 
         return candidate
 
-    def __init__(self, v, i, centroid, angular_width=10000, offset_from_center=10000, stdev=10000, midangle=10000):
+    def __init__(self, v, i, centroid, angular_width=10000, offset_from_center=10000, stdev=10000, midangle=10000, curve_score=10000,):
         self.v = v
         self.i = i
         self.centroid = centroid
@@ -90,6 +92,7 @@ class Candidate(object):
         self.stdev = stdev
         self.offset_from_center = offset_from_center
         self.midangle = midangle
+        self.curve_score = curve_score
 
     def score(self):
         # lower score = better candidate for a corner
@@ -101,7 +104,7 @@ class Candidate(object):
         # how much bigger are we than 90º?
         # If we're less, then we're more likely to be a corner so we don't penalize for below 90º
         angle_error = max(0, self.angle - math.pi/2)
-        score = (0.7 * angle_error) + (0.4 * self.offset_from_center) + (13.0 * (self.stdev ** 2))
+        score = (0.7 * angle_error) + (0.4 * self.offset_from_center) + (11.0 * (self.stdev ** 2)) + (0.8 * self.curve_score)
         return score
 
     def __repr__(self) -> str:
@@ -248,7 +251,8 @@ class Vector(object):
                     if rel_angle < 0:
                         rel_angle += 2 * math.pi
 
-                    self.vertices.append((cx, cy))
+                    if self.vertices[-1] != (cx, cy):
+                        self.vertices.append((cx, cy))
 
                     cx, cy = nx, ny
                     if cx == sx and cy == sy:
@@ -295,9 +299,9 @@ class Vector(object):
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(self.vertices)):
-            debug = self.vertices[i][1] == 850
+            debug = self.vertices[i][1] == 1070
             candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
-            if not candidate or candidate.score() > 2.5:
+            if not candidate or candidate.score() > 3.0:
                 if debug:
                     print(f">>>>>> Skipping; score too high: {candidate.score() if candidate else 0.0}")
                 continue
