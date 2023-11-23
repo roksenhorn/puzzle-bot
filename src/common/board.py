@@ -229,7 +229,8 @@ def build_from_corner(ps, start_piece_id):
         priority, data = heapq.heappop(priority_q)
         board, start_piece_id, start_orientation, x, y, direction = data
         # print(f"({x}, {y}) moving {direction}")
-        if iteration % 1000 == 0 or True:
+        if iteration % 50 == 0:
+            print("\n" * 40)
             print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
 
