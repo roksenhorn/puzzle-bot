@@ -95,11 +95,10 @@ def vectorize(input_path, output_path, id, serialize):
             vector.load_and_vectorize(arg)
     else:
         with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-            results = pool.map(vector.load_and_vectorize, args)
+            pool.map(vector.load_and_vectorize, args)
 
     duration = time.time() - start_time
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
-    return results
 
 
 def find_connectivity(input_path, output_path, id, serialize):
