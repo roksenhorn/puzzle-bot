@@ -1,3 +1,8 @@
+"""
+Prank mode:
+- ignores pieces with no matches
+- TODO: tries flipping pieces to see if they'll have matches
+"""
 import cProfile
 import argparse
 import os
@@ -9,7 +14,7 @@ from common import board, connect, segment, util, vector
 
 
 INPUT_DIR = '0_input'
-SEGMENT_DIR = '1_segmented'
+SEGMENT_DIR = '1_prank'
 VECTOR_DIR = '2_vector'
 CONNECTIVITY_DIR = '3_connectivity'
 SOLUTION_DIR = '4_solution'
@@ -95,11 +100,10 @@ def vectorize(input_path, output_path, id, serialize):
             vector.load_and_vectorize(arg)
     else:
         with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-            results = pool.map(vector.load_and_vectorize, args)
+            pool.map(vector.load_and_vectorize, args)
 
     duration = time.time() - start_time
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
-    return results
 
 
 def find_connectivity(input_path, output_path, id, serialize):
