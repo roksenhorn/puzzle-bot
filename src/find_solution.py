@@ -1,7 +1,7 @@
 """
 Prank mode:
 - ignores pieces with no matches
-- TODO: tries flipping pieces to see if they'll have matches
+- Tries flipping pieces to see if they'll have matches
 """
 import cProfile
 import argparse
@@ -15,12 +15,13 @@ from common import board, connect, segment, util, vector
 
 INPUT_DIR = '0_input'
 SEGMENT_DIR = '1_prank'
+FLIP_SEGMENT_DIR = '1_flip'
 VECTOR_DIR = '2_vector'
 CONNECTIVITY_DIR = '3_connectivity'
 SOLUTION_DIR = '4_solution'
 
 
-def solve(path, serialize, id, skip_step, stop_step):
+def solve(path, width, height, serialize, id, skip_step, stop_step):
     start_time = time.time()
 
     for i, d in enumerate([INPUT_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
@@ -35,18 +36,46 @@ def solve(path, serialize, id, skip_step, stop_step):
         segment_each(input_path=os.path.join(path, INPUT_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if skip_step < 1 and stop_step > 1:
+        start_id = flip_each(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, FLIP_SEGMENT_DIR))
         vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+        vectorize(input_path=os.path.join(path, FLIP_SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize, start_id=start_id)
 
     if skip_step < 2 and stop_step > 2:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
 
     if skip_step < 3 and stop_step > 3 and not id:
-        build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
+        build_board(width, height, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
     print('')
 
     duration = time.time() - start_time
     print(f"\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
+
+
+def flip_each(input_path, output_path):
+    """
+    Loads each image in the input directory, segments it into a black & white bitmap in the output directory
+    """
+    print(f"\n{util.RED}### Flipping ###{util.WHITE}\n")
+
+    out_id = 1
+    while os.path.exists(os.path.join(input_path, f'{out_id}.bmp')):
+        out_id += 1
+
+    start_time = time.time()
+    start_id = out_id
+    i = 1
+    while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
+        input_img_path = os.path.join(input_path, f'{i}.bmp')
+        output_img_path = os.path.join(output_path, f'{out_id}.bmp')
+        print(f"> Flipping image {input_img_path} into {output_img_path}")
+        segment.flip(input_img_path, output_img_path)
+        i += 1
+        out_id += 1
+
+    duration = time.time() - start_time
+    print(f"Flipping took {round(duration, 2)} seconds ({round(duration/i, 2)} seconds per image)")
+    return start_id
 
 
 def segment_each(input_path, output_path, id):
@@ -76,14 +105,14 @@ def segment_each(input_path, output_path, id):
     print(f"Segmenting took {round(duration, 2)} seconds ({round(duration/i, 2)} seconds per image)")
 
 
-def vectorize(input_path, output_path, id, serialize):
+def vectorize(input_path, output_path, id, serialize, start_id=1):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
     print(f"\n{util.RED}### Vectorizing ###{util.WHITE}\n")
 
     start_time = time.time()
-    i = id if id is not None else 1
+    i = id if id is not None else start_id
 
     args = []
     while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
@@ -117,13 +146,13 @@ def find_connectivity(input_path, output_path, id, serialize):
     print(f"Building the graph took {round(duration, 2)} seconds")
 
 
-def build_board(input_path, output_path):
+def build_board(width, height, input_path, output_path):
     """
     Searches connectivity to find the solution
     """
     print(f"\n{util.RED}### Build board ###{util.WHITE}\n")
     start_time = time.time()
-    board.build(input_path, output_path)
+    board.build(width, height, input_path, output_path)
     duration = time.time() - start_time
     print(f"Building the board took {round(duration, 2)} seconds")
 
@@ -161,12 +190,14 @@ def main():
     parser.add_argument('--stop-at-step', default=10, required=False, help='Stop processing at this step', type=int)
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
     parser.add_argument('--rename', default=False, action="store_true", help='Renames the input files to 1.jpeg, 2.jpeg, ...')
+    parser.add_argument('--width', required=True, help='Width of the puzzle in pieces', type=int)
+    parser.add_argument('--height', required=True, help='Width of the puzzle in pieces', type=int)
     args = parser.parse_args()
 
     if args.rename:
         rename(path=args.path)
 
-    solve(path=args.path, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
+    solve(path=args.path, width=args.width, height=args.height, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
 
 
 if __name__ == '__main__':

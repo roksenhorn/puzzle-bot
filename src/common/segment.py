@@ -8,6 +8,15 @@ SEG_THRESH = (125*3)
 SCALE_BY = 0.12
 
 
+def flip(input_path, output_path):
+    """
+    Loads an image file, flips it horizontally, and saves it to the output path
+    """
+    with Image.open(input_path) as img:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img.save(output_path)
+
+
 def segment(filename, output_path=None, scale_by=SCALE_BY,
             threshold=SEG_THRESH, clean_and_crop=True):
     """

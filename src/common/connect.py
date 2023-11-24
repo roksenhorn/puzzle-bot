@@ -70,13 +70,13 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
 
         # make sure we have at least one match
         if len(piece.fits[si]) == 0:
-            raise Exception(f'Piece {piece_id} side {si} has no matches but is not an edge')
+            print(f'Piece {piece_id} side {si} has no matches but is not an edge: considering as a prank piece')
 
         # sort by error
         piece.fits[si] = sorted(piece.fits[si], key=lambda x: x[2])
-        least_error = piece.fits[si][0][2]
 
         # only keep the best matches
+        least_error = piece.fits[si][0][2] if len(piece.fits[si]) > 0 else 0
         piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * 3.0]
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")

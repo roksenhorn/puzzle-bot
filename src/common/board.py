@@ -35,10 +35,9 @@ class Orientation(object):
     ZERO_POINTS_DOWN = 2
     ZERO_POINTS_LEFT = 3
 
-# dimensions for the puzzle you're solving
-# TODO: this should be taken in as config
-WIDTH = 40
-HEIGHT = 25
+
+WIDTH = None
+HEIGHT = None
 
 
 class Board(object):
@@ -163,7 +162,11 @@ class Board(object):
         return self.placed_count < other.placed_count
 
 
-def build(input_path, output_path):
+def build(width, height, input_path, output_path):
+    global WIDTH, HEIGHT
+    WIDTH = width
+    HEIGHT = height
+
     print("> Loading connectivity graph...")
     with open(os.path.join(input_path, 'connectivity.json'), 'r') as f:
         ps_raw = yaml.safe_load(f)
@@ -186,10 +189,12 @@ def build(input_path, output_path):
             if edge_count > 1:
                 corners.append(piece_id)
 
+    corners = sorted(corners)[0:4]
+
     print(f"Corners: {corners}, Edges: {len(edges)}")
     if len(corners) != 4:
         raise Exception(f"Expected 4 corners, got {len(corners)}")
-    if len(edges) != edge_length:
+    if len(edges) < edge_length:
         raise Exception(f"Expected {edge_length} pieces on the edge, got {len(edges)}")
 
     success = False
