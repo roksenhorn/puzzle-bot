@@ -23,21 +23,36 @@ def load_binary_image(path):
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
+        width, height = img.size
+        pixels = np.array(img.getdata())
+
+    # Reshape to 2D and convert to 1s and 0s
+    pixels = pixels.reshape((height, width))
+    binary_pixels = np.where(pixels > 0, 1, 0).astype(np.int8)
+    return binary_pixels, width, height
+
+
+def load_color_image(path):
+    """
+    Given a bitmap image path, returns a 2D array of 1s and 0s
+    """
+    with Image.open(path) as img:
         # Get image data as a 1D array of pixels
         width, height = img.size
         pixels = list(img.getdata())
 
     # Convert pixels to 0 or 1 2D array
-    binary_pixels = []
+    binary_pixels = np.empty(height, dtype=object)
     for i, pixel in enumerate(pixels):
         if type(pixel) == tuple:
             pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
             pixel = 0 if pixel_val > 100 else 1
         x = i % width
         y = i // width
-        if y >= len(binary_pixels):
-            binary_pixels.append([])
-        binary_pixels[y].append(1 if pixel > 0 else 0)
+        if x == 0:
+            row = np.empty(width, dtype=np.int8)
+            binary_pixels[y] = row
+        binary_pixels[y][x] = 1 if pixel > 0 else 0
 
     return binary_pixels, width, height
 

@@ -14,7 +14,7 @@ PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 def extract_pieces(input_path, n, output_path=None):
     print(f"Loading {input_path.split('/')[-1]}...")
-    pixels, _, _ = util.load_binary_image(input_path)
+    pixels, _, _ = util.load_color_image(input_path)
 
     def save_island(island, i):
         return extract_piece(i + 1, island, output_path)

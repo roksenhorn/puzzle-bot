@@ -3,6 +3,7 @@ import json
 import math
 import os
 from typing import List
+import numpy as np
 
 from common import sides, util
 
@@ -27,6 +28,12 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 # scale pixel offsets depending on how big the BMPs are
 # 1.0 is tuned for around 100 pixels wide
 SCALAR = 4.0
+
+
+def load_and_vectorize(args):
+    filename, id, output_path, render = args
+    v = Vector.from_file(filename, id)
+    return v.process(output_path, render)
 
 
 class Candidate(object):
@@ -175,26 +182,52 @@ class Vector(object):
 
         for i, side in enumerate(self.sides):
             side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
-            data = {'piece_id': self.id, 'side_index': i, 'vertices': [list(v) for v in side.vertices], 'piece_center': list(side.piece_center), 'is_edge': side.is_edge}
+            # convert vertices from np types to native python types
+            vertices = [[int(v[0]), int(v[1])] for v in side.vertices]
+            data = {'piece_id': self.id, 'side_index': i, 'vertices': vertices, 'piece_center': list(side.piece_center), 'is_edge': side.is_edge}
             with open(side_path, 'w') as f:
                 f.write(json.dumps(data))
 
     def find_border_raster(self) -> None:
-        self.border = [[0 for i in range(self.width)] for j in range(self.height)]
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                v = self.pixels[y][x]
-                if v == 0:
-                    continue
+        # Ensure pixels is a numpy array
+        pixels = np.array(self.pixels)
 
-                neighbors = [
-                    self.pixels[y - 1][x],  # above
-                    self.pixels[y + 1][x],  # below
-                    self.pixels[y][x - 1],  # left
-                    self.pixels[y][x + 1],  # right
-                ]
-                if not all(neighbors):
-                    self.border[y][x] = 1
+        # Initialize the border array with np.int8 data type
+        self.border = np.zeros_like(pixels, dtype=np.int8)
+
+        # Extract slices for the current pixel and its neighbors
+        center = pixels[1:-1, 1:-1]
+        above = pixels[:-2, 1:-1]
+        below = pixels[2:, 1:-1]
+        left = pixels[1:-1, :-2]
+        right = pixels[1:-1, 2:]
+
+        # Determine border pixels
+        border_mask = (center != 0) & ((above == 0) | (below == 0) | (left == 0) | (right == 0))
+        self.border[1:-1, 1:-1] = border_mask.astype(np.int8)
+
+        # for row in self.border:
+            # print(''.join(['#' if pixel else '.' for pixel in row]))
+
+        # print("\n\n")
+        # self.border = [[0 for i in range(self.width)] for j in range(self.height)]
+        # for y in range(1, self.height - 1):
+        #     for x in range(1, self.width - 1):
+        #         v = self.pixels[y][x]
+        #         if v == 0:
+        #             continue
+
+        #         neighbors = [
+        #             self.pixels[y - 1][x],  # above
+        #             self.pixels[y + 1][x],  # below
+        #             self.pixels[y][x - 1],  # left
+        #             self.pixels[y][x + 1],  # right
+        #         ]
+        #         if not all(neighbors):
+        #             self.border[y][x] = 1
+        # for row in self.border:
+        #     print(''.join(['#' if pixel else '.' for pixel in row]))
+
 
     def vectorize(self) -> None:
         """
@@ -202,17 +235,10 @@ class Vector(object):
         So we find the top-left most border pixel, then sweep a polyline around the border
         As we go, we capture how much the angle of the polyline changes at each step
         """
-        sx, sy = None, None
 
         # start at the first border pixel we find
-        for y, row in enumerate(self.border):
-            if any(row):
-                sy = y
-                sx = row.index(1)
-                break
-
-        if sx is None or sy is None:
-            raise Exception(f"Piece @ {self.id} has no border to walk")
+        indices = np.argwhere(self.border == 1)
+        sy, sx = tuple(indices[0])
 
         self.vertices = [(sx, sy)]
         cx, cy = sx, sy

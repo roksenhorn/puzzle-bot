@@ -52,8 +52,7 @@ def segment_each(input_path, output_path, id):
 
     start_time = time.time()
     i = id if id is not None else 1
-    pool = multiprocessing.Pool()
-    with multiprocessing.Pool(processes=8) as pool:
+    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         results = []
         while os.path.exists(os.path.join(input_path, f'{i}.jpeg')):
             input_img_path = os.path.join(input_path, f'{i}.jpeg')
@@ -81,32 +80,22 @@ def vectorize(input_path, output_path, id, serialize):
     start_time = time.time()
     i = id if id is not None else 1
 
+    args = []
+    while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
+        path = os.path.join(input_path, f'{i}.bmp')
+        render = (i == id)
+        args.append([path, i, output_path, render])
+
+        i += 1
+        if id is not None:
+            break
+
     if serialize:
-        while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
-            path = os.path.join(input_path, f'{i}.bmp')
-            vectorize = vector.Vector.from_file(filename=path, id=i)
-            render = (i == id)
-            vectorize.process(output_path, render)
-
-            i += 1
-            if id is not None:
-                break
+        for arg in args:
+            vector.load_and_vectorize(arg)
     else:
-        pool = multiprocessing.Pool()
-        with multiprocessing.Pool(processes=8) as pool:
-            results = []
-            while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
-                path = os.path.join(input_path, f'{i}.bmp')
-                vectorize = vector.Vector.from_file(filename=path, id=i)
-                render = (i == id)
-                results.append(pool.apply_async(vectorize.process, args=(output_path, render)))
-
-                i += 1
-                if id is not None:
-                    break
-
-            for r in results:
-                r.get()
+        with multiprocessing.Pool(processes=os.cpu_count()) as pool:
+            results = pool.map(vector.load_and_vectorize, args)
 
     duration = time.time() - start_time
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
