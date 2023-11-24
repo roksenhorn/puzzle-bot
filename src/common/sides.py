@@ -1,5 +1,6 @@
 import math
 from typing import List, Tuple
+import numpy as np
 
 from common import util
 
@@ -107,4 +108,4 @@ class Side(object):
             min_x = min([v[0] for v in rotated])
             rotated = [(v[0] - min_x, v[1]) for v in rotated]
 
-        return rotated
+        return np.array(rotated)

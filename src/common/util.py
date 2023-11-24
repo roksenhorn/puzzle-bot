@@ -261,23 +261,9 @@ def error_between_polylines(polyline1, polyline2, p1_len):
     Returns the total integrated error between two polylines
     """
     def _error_between_polylines(p1, p2):
-        error = 0
-        error_x = 0
-        error_y = 0
-
-        for t in range(len(p1)):
-            # we'll compare how far apart these two points are
-            p1_at_t = p1[t]
-            p2_at_t = p2[t]
-
-            # error-squared, because we want to weight larger errors more heavily
-            x_err = p1_at_t[0] - p2_at_t[0]
-            y_err = p1_at_t[1] - p2_at_t[1]
-            error += abs(x_err) + abs(y_err)
-            error_x += x_err
-            error_y += y_err
-        error_x /= len(p1)
-        error_y /= len(p1)
+        differences = np.abs(p1 - p2)
+        error = np.sum(differences)
+        error_x, error_y = np.sum(differences - p1 + p2, axis=0) / len(p1)
         return error, error_x, error_y
 
     # sample along the polylines at fixed intervals

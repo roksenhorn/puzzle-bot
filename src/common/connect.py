@@ -24,7 +24,6 @@ def build(input_path, output_path, id=None, serialize=False):
     print("\t ...Loaded")
 
     if not serialize and id is None:
-        pool = multiprocessing.Pool()
         with multiprocessing.Pool(processes=8) as pool:
             results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
             out = [r.get() for r in results]

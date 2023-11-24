@@ -99,6 +99,7 @@ def vectorize(input_path, output_path, id, serialize):
 
     duration = time.time() - start_time
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
+    return results
 
 
 def find_connectivity(input_path, output_path, id, serialize):

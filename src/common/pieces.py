@@ -1,5 +1,6 @@
 import os
 import json
+import numpy as np
 
 from common import sides
 
@@ -27,7 +28,7 @@ class Piece(object):
             path = os.path.join(directory, f"side_{id}_{side_index}.json")
             with open(path, "r") as f:
                 data = json.load(f)
-            side = sides.Side(piece_id=id, side_id=side_index, vertices=data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=resample)
+            side = sides.Side(piece_id=id, side_id=side_index, vertices=np.array(data['vertices']), piece_center=data['piece_center'], is_edge=data['is_edge'], resample=resample)
             sides_list.append(side)
         piece = cls(id=id, is_edge=False, sides=sides_list)
         return piece
