@@ -16,6 +16,7 @@ WHITE = '\033[0m'
 BLACK_ON_WHITE = '\033[30;47m'
 BLACK_ON_BLUE = '\033[30;44m'
 BLACK_ON_RED = '\033[30;41m'
+BLACK_ON_GREEN = '\033[30;42m'
 
 
 def load_binary_image(path):
@@ -147,6 +148,29 @@ def centroid(polygon):
     poly = Polygon(polygon)
     centroid = poly.centroid
     return (int(round(centroid.x)), int(round(centroid.y)))
+
+
+def incenter(polygon):
+    """
+    Finds the point inside the polygon furthest from the edges.
+    This should be the best area to grip the piece by.
+    """
+    polygon = Polygon(polygon)
+
+    c = polygon.centroid
+    search_radius = 0.25 * (polygon.bounds[2] - polygon.bounds[0])
+    stride = 8
+    minx, miny, maxx, maxy = c.x - search_radius, c.y - search_radius, c.x + search_radius, c.y + search_radius
+    points = np.array([Point(x, y) for x in range(int(minx), int(maxx), stride) for y in range(int(miny), int(maxy), stride)])
+
+    max_distance = 0
+    incenter = None
+    for point in points:
+        distance = polygon.exterior.distance(point)
+        if distance > max_distance:
+            max_distance = distance
+            incenter = point
+    return (int(round(incenter.x)), int(round(incenter.y)))
 
 
 def intersection(line1, line2):

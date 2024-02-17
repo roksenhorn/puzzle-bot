@@ -176,6 +176,7 @@ class Vector(object):
             v = side.vertices[0]
             svg += f'<circle cx="{v[0]}" cy="{v[1]}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
         svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#990000; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{1.0}" style="fill:#664400; stroke-width:0" />'
         svg += '</svg>'
         with open(full_svg_path, 'w') as f:
             f.write(svg)
@@ -184,7 +185,7 @@ class Vector(object):
             side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
             # convert vertices from np types to native python types
             vertices = [[int(v[0]), int(v[1])] for v in side.vertices]
-            data = {'piece_id': self.id, 'side_index': i, 'vertices': vertices, 'piece_center': list(side.piece_center), 'is_edge': side.is_edge}
+            data = {'piece_id': self.id, 'side_index': i, 'vertices': vertices, 'piece_center': list(side.piece_center), 'is_edge': side.is_edge, 'incenter': list(self.incenter)}
             with open(side_path, 'w') as f:
                 f.write(json.dumps(data))
 
@@ -290,6 +291,7 @@ class Vector(object):
                 raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")
 
         self.centroid = util.centroid(self.vertices)
+        self.incenter = util.incenter(self.vertices)
 
     def merge_close_points(self, vs, threshold):
         i = -len(vs)
@@ -569,6 +571,7 @@ class Vector(object):
             lines[py][px] = f"{util.BLACK_ON_BLUE}{value} {util.WHITE}"
 
         lines[self.centroid[1]][self.centroid[0]] = f"{util.BLACK_ON_RED}X {util.WHITE}"
+        lines[self.incenter[1]][self.incenter[0]] = f"{util.BLACK_ON_GREEN}. {util.WHITE}"
 
         print(f' {util.GRAY} ' + 'v ' * self.width + f"{util.WHITE}")
         for i, line in enumerate(lines):
