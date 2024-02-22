@@ -1,4 +1,4 @@
-# jigsaw-bot
+# puzzle-bot
 
 The code that powers a jigsaw puzzle solving robot. The hope is to be able to solve a 1000 piece all-white puzzle. I'm making some of this easier on myself by assuming each piece is _regular_ shaped (four sides, no whacky geometry).
 
