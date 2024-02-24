@@ -20,7 +20,7 @@ def extract_pieces(input_path, n, output_path=None):
         return extract_piece(i + 1, island, output_path)
 
     print(f"Finding islands...")
-    islands = util.find_islands(pixels, callback=save_island)
+    islands = util.find_islands(pixels, callback=save_island, ignore_islands_along_border=True)
     if len(islands) != n:
         raise Exception(f"Expected {n} pieces but found {len(islands)}")
 

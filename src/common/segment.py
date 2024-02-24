@@ -82,7 +82,7 @@ def _remove_small_islands(pixels) -> None:
     """
     # find all the islands
     lines = [[e for e in l] for l in pixels]
-    islands = util.find_islands(lines)
+    islands = util.find_islands(lines, ignore_islands_along_border=True)
 
     # sort islands (which is a list of list) by len of each island
     islands.sort(key=lambda i: len(i), reverse=True)

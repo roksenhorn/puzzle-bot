@@ -343,23 +343,6 @@ def _distance_to_segment(point, p1, p2):
     return distance(point, (x0, y0)), (x0, y0)
 
 
-def _point_at_t_along_polyline(polyline, length, t, i, at_dist):
-    """
-    Given a polyline and a t from 0 to 1, finds the point on the polyline at that t
-    """
-    target_dist = t * length
-
-    while at_dist <= target_dist:
-        next_dist = distance(polyline[i], polyline[i + 1])
-        if at_dist + next_dist < target_dist:
-            at_dist += next_dist
-            i += 1
-        else:
-            # find the point along this next segment that gives us the remaining distance
-            remaining_dist = target_dist - at_dist
-            return point_at_dist_along_segment(polyline[i], polyline[i + 1], remaining_dist), i, at_dist
-
-
 def point_at_dist_along_segment(p1, p2, dist):
     """
     Returns the point that is dist away from p1 along the line segment p1-p2
@@ -473,9 +456,6 @@ def angular_stdev(angles):
 def curve_score(points, debug=False) -> float:
     """
     `point` is the point we're checking
-    `points_before` is a list of points that come before `point` in the polyline
-    `points_after` is a list of points that come after `point` in the polyline
-    `centroid` is the centroid of the piece
     Returns a score of how likely this point is on a curve that opens toward the centroid, rather than a corner
     e.g. the center of this:
     after ->    /
@@ -557,8 +537,20 @@ def sublist_exists(lst, sub_lst):
 
     return sub_lst_str in lst_extended_str
 
+def find_islands(grid, callback=None, ignore_islands_along_border=False):
+    """
+    Given a grid of 0s and 1s, finds all "islands" of 1s:
+    00000000
+    01110000
+    01111000
+    00111110
+    00000000
 
-def find_islands(grid, callback=None):
+    :param grid: a 2D array of 0s and 1s
+    :param callback: a function that will be called with each island found
+    :param ignore_islands_along_border: if True, islands that touch the border of the grid will be ignored
+    Returns either a list of islands, or a list of Trues if a callback was provided
+    """
     visited1 = set()
     visited2 = set()
     islands = []
@@ -582,6 +574,16 @@ def find_islands(grid, callback=None):
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                             if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
                                 queue.append((x + dx, y + dy))
+
+                ignore_island = False
+                if ignore_islands_along_border:
+                    for x, y in island:
+                        if x == 0 or y == 0 or x == len(grid) - 1 or y == len(grid[0]) - 1:
+                            ignore_island = True
+                            break
+                if ignore_island:
+                    print(f"\t > Ignoring island {len(islands)} because it was along the border")
+                    continue
 
                 print(f"\t > {len(island)} pixels in island {len(islands)}")
                 if callback:
