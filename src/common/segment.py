@@ -50,8 +50,6 @@ def _load(filename, scale_by) -> List[Tuple[int, int, int]]:
 def _segment(rgb_pixels, width, height, threshold) -> None:
     """
     Segments the image into black and white pixels
-    White is a part of the puzzle piece
-    Black is background
     """
     bw_pixels = []
 

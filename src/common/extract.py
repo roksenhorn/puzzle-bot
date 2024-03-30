@@ -1,8 +1,3 @@
-"""
-Given a large bitmap image containing many pieces, extracts each piece into its own bitmap image
-Processes the image by removing dust and hairs, then crops tightly leaving a 1px margin around the piece
-"""
-import argparse
 import os
 import PIL
 
@@ -12,17 +7,16 @@ from common import util
 PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 
-def extract_pieces(input_path, n, output_path=None):
+def extract_pieces(input_path, output_path=None):
     print(f"Loading {input_path.split('/')[-1]}...")
-    pixels, _, _ = util.load_color_image(input_path)
+    pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def save_island(island, i):
         return extract_piece(i + 1, island, output_path)
 
     print(f"Finding islands...")
     islands = util.find_islands(pixels, callback=save_island, ignore_islands_along_border=True)
-    if len(islands) != n:
-        raise Exception(f"Expected {n} pieces but found {len(islands)}")
+    print(f"Found {len(islands)} pieces")
 
 
 def extract_piece(piece_id, piece_coordinates, output_path=None):
@@ -58,13 +52,3 @@ def extract_piece(piece_id, piece_coordinates, output_path=None):
         img.save(os.path.join(output_path, f'{piece_id}.bmp'))
 
     return True
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--input-path', required=True, help='Path to a binary bitmap image')
-    parser.add_argument('--number-of-pieces', required=True, type=int, help='how many pieces are in the image')
-    parser.add_argument('--output-path', required=False, default=None, help='directory to save the individual piece bitmaps to')
-    args = parser.parse_args()
-
-    extract_pieces(args.input_path, args.number_of_pieces, args.output_path)

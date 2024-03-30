@@ -4,44 +4,102 @@ import os
 import time
 import multiprocessing
 import re
+import PIL
 
-from common import board, connect, segment, util, vector
-
-
-INPUT_DIR = '0_input'
-SEGMENT_DIR = '1_segmented'
-VECTOR_DIR = '2_vector'
-CONNECTIVITY_DIR = '3_connectivity'
-SOLUTION_DIR = '4_solution'
+from common import extract, board, connect, segment, util, vector
 
 
-def solve(path, serialize, id, skip_step, stop_step):
+# Step 1 takes in photos of pieces on the bed and output BMPs that contain multiple pieces
+PHOTOS_DIR = '0_photos'
+PHOTO_BMP_DIR = '1_photo_bmps'
+
+# Step 2 takes in photo BMPs and outputs cleaned up individual pieces as bitmaps
+SEGMENT_DIR = '2_segmented'
+
+# Step 3 takes in piece BMPs and outputs SVGs
+VECTOR_DIR = '3_vector'
+
+# Step 4 takes in SVGs and outputs a graph of connectivity
+CONNECTIVITY_DIR = '4_connectivity'
+
+# Step 5 takes in the graph of connectivity and outputs a solution
+SOLUTION_DIR = '5_solution'
+
+
+def solve(path, serialize, id, start_at_step, stop_before_step):
     start_time = time.time()
 
-    for i, d in enumerate([INPUT_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
+    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
         # wipe any directories we'll act on, except 0 which is the input
-        if i != 0 and i > skip_step + 1 and i < stop_step:
+        if i != 0 and i > start_at_step + 1 and i < stop_before_step:
             for f in os.listdir(os.path.join(path, d)):
                 os.remove(os.path.join(path, d, f))
 
-    if skip_step < 0 and stop_step > 0:
-        segment_each(input_path=os.path.join(path, INPUT_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
+    if start_at_step <= 0 and stop_before_step > 0:
+        bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
 
-    if skip_step < 1 and stop_step > 1:
+    if start_at_step <= 1 and stop_before_step > 1:
+        extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
+        # segment_each(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
+
+    if start_at_step <= 2 and stop_before_step > 2:
         vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
-    if skip_step < 2 and stop_step > 2:
+    if start_at_step <= 3 and stop_before_step > 3:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
 
-    if skip_step < 3 and stop_step > 3 and not id:
+    if start_at_step <= 4 and stop_before_step > 4 and not id:
         build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
-    print('')
+    if stop_before_step is None:
+        duration = time.time() - start_time
+        print(f"\n\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
 
-    duration = time.time() - start_time
-    print(f"\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
+
+def bmp_all(input_path, output_path, id):
+    """
+    Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
+    """
+    MAX_WIDTH = 1500
+
+    if id:
+        fs = [f'{id}.jpeg']
+    else:
+        fs = os.listdir(input_path)
+        id = 1
+
+    for f in fs:
+        if re.match(r'.*\.jpe?g', f):
+            input_img_path = os.path.join(input_path, f)
+            output_img_path = os.path.join(output_path, f'{id}.bmp')
+            print(f"> Turning {input_img_path} into {output_img_path}")
+            pixels, w, h = util.binary_pixel_data_for_photo(input_img_path, white_pieces=True, max_width=MAX_WIDTH)
+            img = PIL.Image.new('1', (w, h))
+            img.putdata([pixel for row in pixels for pixel in row])
+            img.save(os.path.join(output_path, f'{id}.bmp'))
+
+            id += 1
+
+
+def extract_all(input_path, output_path, id):
+    """
+    Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
+    """
+    if id:
+        fs = [f'{id}.bmp']
+    else:
+        fs = os.listdir(input_path)
+        id = 1
+
+    for f in fs:
+        if re.match(r'[0-9]+\.bmp', f):
+            input_img_path = os.path.join(input_path, f)
+            output_img_path = os.path.join(output_path, f'{id}.bmp')
+            print(f"> Extracting image {input_img_path} into {output_img_path}")
+            extract.extract_pieces(input_img_path, output_path)
+            id += 1
 
 
 def segment_each(input_path, output_path, id):
@@ -124,7 +182,7 @@ def build_board(input_path, output_path):
 
 
 def rename(path):
-    d = os.path.join(path, INPUT_DIR)
+    d = os.path.join(path, PHOTOS_DIR)
 
     # for each file in this directory, rename it to i.jpeg
     i = 1
@@ -152,8 +210,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
     parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=int)
-    parser.add_argument('--skip-step', default=-1, required=False, help='Start processing from after this step', type=int)
-    parser.add_argument('--stop-at-step', default=10, required=False, help='Stop processing at this step', type=int)
+    parser.add_argument('--start-at-step', default=0, required=False, help='Start processing at this step', type=int)
+    parser.add_argument('--stop-before-step', default=10, required=False, help='Stop processing at this step', type=int)
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
     parser.add_argument('--rename', default=False, action="store_true", help='Renames the input files to 1.jpeg, 2.jpeg, ...')
     args = parser.parse_args()
@@ -161,7 +219,7 @@ def main():
     if args.rename:
         rename(path=args.path)
 
-    solve(path=args.path, serialize=args.serialize, id=args.only_process_id, skip_step=args.skip_step, stop_step=args.stop_at_step)
+    solve(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
 
 
 if __name__ == '__main__':

@@ -33,13 +33,17 @@ def load_binary_image(path):
     return binary_pixels, width, height
 
 
-def load_color_image(path):
+def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
+        if max_width is not None and img.size[0] > max_width:
+            img.thumbnail((max_width, img.size[1]))
+
         # Get image data as a 1D array of pixels
         width, height = img.size
+        print(f"Image size: {width} x {height}")
         pixels = list(img.getdata())
 
     # Convert pixels to 0 or 1 2D array
@@ -47,7 +51,10 @@ def load_color_image(path):
     for i, pixel in enumerate(pixels):
         if type(pixel) == tuple:
             pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
-            pixel = 0 if pixel_val > 100 else 1
+            if white_pieces:
+                pixel = 0 if pixel_val <= 100 else 1
+            else:
+                pixel = 0 if pixel_val > 100 else 1
         x = i % width
         y = i // width
         if x == 0:
