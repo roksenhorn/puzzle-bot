@@ -4,12 +4,12 @@ from typing import List, Tuple
 from common import util
 
 
-BMP_WIDTH = 1200
-CROP_ALL_SIDES_BY = 140
+BMP_WIDTH = 1050
+CROP_ALL_SIDES_BY = 75
 MIN_PIECE_AREA = 110*110
 
 WHITE_PIECES = True
-SEG_THRESH = 180  # for white pieces, raise this to cut tighter into the border
+SEG_THRESH = 177  # for white pieces, raise this to cut tighter into the border
 
 
 def photo_to_bmp(args):

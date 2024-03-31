@@ -15,14 +15,14 @@ def extract_pieces(args):
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def found_island(island, i):
-        return clean_and_save_piece(unique_id, i + 1, island, output_path)
+        return _clean_and_save_piece(unique_id, i + 1, island, output_path)
 
     islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
     print(f"Extracted {len(islands)} pieces from {input_path.split('/')[-1]}")
     return len(islands)
 
 
-def clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
+def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
     if len(piece_coordinates) < 100:
         return False
 

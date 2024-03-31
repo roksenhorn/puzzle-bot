@@ -6,7 +6,7 @@ import multiprocessing
 import re
 import PIL
 
-from common import extract, board, connect, bmp, util, vector
+from common import bmp, board, connect, dedupe, extract, util, vector
 
 
 # Step 1 takes in photos of pieces on the bed and output BMPs that contain multiple pieces
@@ -16,20 +16,23 @@ PHOTO_BMP_DIR = '1_photo_bmps'
 # Step 2 takes in photo BMPs and outputs cleaned up individual pieces as bitmaps
 SEGMENT_DIR = '2_segmented'
 
-# Step 3 takes in piece BMPs and outputs SVGs
-VECTOR_DIR = '3_vector'
+# Step 3 goes through all the BMP pieces and deletes duplicates
+DEDUPED_DIR = '3_deduped'
 
-# Step 4 takes in SVGs and outputs a graph of connectivity
-CONNECTIVITY_DIR = '4_connectivity'
+# Step 4 takes in piece BMPs and outputs SVGs
+VECTOR_DIR = '4_vector'
 
-# Step 5 takes in the graph of connectivity and outputs a solution
-SOLUTION_DIR = '5_solution'
+# Step 5 takes in SVGs and outputs a graph of connectivity
+CONNECTIVITY_DIR = '5_connectivity'
+
+# Step 6 takes in the graph of connectivity and outputs a solution
+SOLUTION_DIR = '6_solution'
 
 
 def solve(path, serialize, id, start_at_step, stop_before_step):
     start_time = time.time()
 
-    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
+    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, DEDUPED_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
         # wipe any directories we'll act on, except 0 which is the input
@@ -44,12 +47,15 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
         extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+        deduplicate(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, DEDUPED_DIR))
 
     if start_at_step <= 3 and stop_before_step > 3:
+        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+
+    if start_at_step <= 4 and stop_before_step > 4:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
 
-    if start_at_step <= 4 and stop_before_step > 4 and not id:
+    if start_at_step <= 5 and stop_before_step > 5 and not id:
         build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
     if stop_before_step is None:
@@ -99,9 +105,11 @@ def extract_all(input_path, output_path, id):
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(extract.extract_pieces, args)
 
-    # finally, rename all files to be 1.bmp, 2.bmp, ...
-    for i, f in enumerate(os.listdir(output_path)):
-        os.rename(os.path.join(output_path, f), os.path.join(output_path, f'{i + 1}.bmp'))
+
+def deduplicate(input_path, output_path):
+    # deduplicate the pieces - often times the same piece was successfully extracted from multiple photos
+    print(f"\n{util.RED}### Deduplicated extracted pieces ###{util.WHITE}\n")
+    dedupe.deduplicate(input_path, output_path)
 
 
 def vectorize(input_path, output_path, id, serialize):

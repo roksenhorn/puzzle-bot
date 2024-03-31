@@ -722,3 +722,15 @@ def render_polylines(vertices_list: List[List[Tuple[int, int]]], bounds=None) ->
         s = ' '.join(row)
         print(f'{GRAY}>   {WHITE}' + s + f'{GRAY}   < {i}{WHITE}')
     print('\n   ' + GRAY + ' ^' * (maxx - minx + 1) + WHITE + '\n')
+
+
+def normalized_ssd(bytes1, bytes2):
+    """
+    Computes the Sum of Squared Differences between two bytes
+    Normalizes the result by the number of pixels
+
+    Note: bytes1 and bytes2 must be the same length
+    """
+    assert len(bytes1) == len(bytes2)
+    ssd = np.sum((bytes1 - bytes2) ** 2)
+    return ssd / len(bytes1)
