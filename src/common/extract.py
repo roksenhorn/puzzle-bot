@@ -7,16 +7,20 @@ from common import util
 PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 
-def extract_pieces(input_path, output_path):
+def extract_pieces(input_path, output_path, start_id):
+    """
+    Returns how many pieces were extracted
+    """
     print(f"Loading {input_path.split('/')[-1]}...")
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def found_island(island, i):
-        return clean_and_save_piece(i + 1, island, output_path)
+        return clean_and_save_piece(i + start_id, island, output_path)
 
     print(f"Extracting pieces from bitmap...")
     islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
     print(f"Found {len(islands)} pieces")
+    return len(islands)
 
 
 def clean_and_save_piece(piece_id, piece_coordinates, output_path):

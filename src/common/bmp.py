@@ -5,7 +5,7 @@ from common import util
 
 
 BMP_WIDTH = 1500
-SEG_THRESH = 135
+SEG_THRESH = 185
 WHITE_PIECES = True
 MIN_PIECE_DIM = 125*125
 

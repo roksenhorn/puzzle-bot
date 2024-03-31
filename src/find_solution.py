@@ -95,8 +95,7 @@ def extract_all(input_path, output_path, id):
             input_img_path = os.path.join(input_path, f)
             output_img_path = os.path.join(output_path)
             print(f"> Extracting image {input_img_path} into {output_img_path}")
-            extract.extract_pieces(input_img_path, output_path)
-            id += 1
+            id += extract.extract_pieces(input_img_path, output_path, start_id=id)
 
 
 def vectorize(input_path, output_path, id, serialize):
