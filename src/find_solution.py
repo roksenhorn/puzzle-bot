@@ -6,7 +6,7 @@ import multiprocessing
 import re
 import PIL
 
-from common import extract, board, connect, segment, util, vector
+from common import extract, board, connect, bmp, util, vector
 
 
 # Step 1 takes in photos of pieces on the bed and output BMPs that contain multiple pieces
@@ -75,7 +75,7 @@ def bmp_all(input_path, output_path, id):
             output_img_path = os.path.join(output_path, f'{id}.bmp')
 
             print(f"> Turning {input_img_path} into {output_img_path}")
-            segment.segment(input_img_path, output_img_path, width=MAX_WIDTH, clean=True)
+            bmp.segment(input_img_path, output_img_path, width=MAX_WIDTH, clean=True)
 
             id += 1
 
@@ -93,7 +93,7 @@ def extract_all(input_path, output_path, id):
     for f in fs:
         if re.match(r'[0-9]+\.bmp', f):
             input_img_path = os.path.join(input_path, f)
-            output_img_path = os.path.join(output_path, f'{id}.bmp')
+            output_img_path = os.path.join(output_path)
             print(f"> Extracting image {input_img_path} into {output_img_path}")
             extract.extract_pieces(input_img_path, output_path)
             id += 1

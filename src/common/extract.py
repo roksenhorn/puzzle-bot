@@ -7,22 +7,23 @@ from common import util
 PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 
-def extract_pieces(input_path, output_path=None):
+def extract_pieces(input_path, output_path):
     print(f"Loading {input_path.split('/')[-1]}...")
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def found_island(island, i):
         return clean_and_save_piece(i + 1, island, output_path)
 
-    print(f"Finding islands...")
+    print(f"Extracting pieces from bitmap...")
     islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
     print(f"Found {len(islands)} pieces")
 
 
-def clean_and_save_piece(piece_id, piece_coordinates, output_path=None):
+def clean_and_save_piece(piece_id, piece_coordinates, output_path):
     if len(piece_coordinates) < 100:
         return False
 
+    # figure out the dimensions of the piece, then pad it with a small border
     BORDER_WIDTH_PX = 1
     xs = [x for (x, _) in piece_coordinates]
     ys = [y for (_, y) in piece_coordinates]
@@ -31,7 +32,7 @@ def clean_and_save_piece(piece_id, piece_coordinates, output_path=None):
     height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
     print(f"{width} x {height}")
 
-    if width < 0.3 * height or height < 0.3 * width:
+    if width < 0.26 * height or height < 0.25 * width:
         print(f"Skipping piece {piece_id} because it is too thin")
         return False
 
@@ -39,16 +40,14 @@ def clean_and_save_piece(piece_id, piece_coordinates, output_path=None):
     for i in range(height):
         pixels.append([])
         for j in range(width):
-            pixels[i].append(0)
+            pixels[i].append(0) # start with an all black background
 
     for (x, y) in piece_coordinates:
         xx = x - minx + BORDER_WIDTH_PX
         yy = y - miny + BORDER_WIDTH_PX
         pixels[yy][xx] = 1
 
-    if output_path:
-        img = PIL.Image.new('1', (width, height))
-        img.putdata([pixel for row in pixels for pixel in row])
-        img.save(os.path.join(output_path, f'{piece_id}.bmp'))
-
+    img = PIL.Image.new('1', (width, height))
+    img.putdata([pixel for row in pixels for pixel in row])
+    img.save(os.path.join(output_path, f'{piece_id}.bmp'))
     return True

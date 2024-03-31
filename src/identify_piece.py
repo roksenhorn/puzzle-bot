@@ -6,7 +6,7 @@ import os
 import yaml
 import argparse
 
-import segment
+import bmp
 import vector
 import sides
 
@@ -16,7 +16,7 @@ VECTOR_DIR = '2_vector'
 
 def find(photo_path, puzzle_dir):
     # vectorize the input photo
-    pixels, w, h = segment.segment(photo_path)
+    pixels, w, h = bmp.segment(photo_path)
     print(w, 'x', h)
     v = vector.Vector(pixels, w, h, id=0).process(render=True)
 

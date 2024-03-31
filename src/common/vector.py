@@ -176,7 +176,7 @@ class Vector(object):
             v = side.vertices[0]
             svg += f'<circle cx="{v[0]}" cy="{v[1]}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
         svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#990000; stroke-width:0" />'
-        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{1.0}" style="fill:#664400; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{50.0}" style="fill:#ff770022; stroke-width:0" />'
         svg += '</svg>'
         with open(full_svg_path, 'w') as f:
             f.write(svg)

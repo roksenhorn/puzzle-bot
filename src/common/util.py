@@ -33,12 +33,10 @@ def load_binary_image(path):
     return binary_pixels, width, height
 
 
-def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
+def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
-    THRESHOLD=120
-
     with Image.open(path) as img:
         if max_width is not None and img.size[0] > max_width:
             img.thumbnail((max_width, img.size[1]))
@@ -54,9 +52,9 @@ def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
         if type(pixel) == tuple:
             pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
             if white_pieces:
-                pixel = 0 if pixel_val <= THRESHOLD else 1
+                pixel = 0 if pixel_val <= threshold else 1
             else:
-                pixel = 0 if pixel_val > THRESHOLD else 1
+                pixel = 0 if pixel_val > threshold else 1
         x = i % width
         y = i // width
         if x == 0:
@@ -65,6 +63,31 @@ def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
         binary_pixels[y][x] = 1 if pixel > 0 else 0
 
     return binary_pixels, width, height
+
+
+def remove_small_islands(pixels, min_size, ignore_islands_along_border=False, island_value=1):
+    """
+    Find and remove all islands of pixels that are smaller than some set number of pixels
+    """
+    print(f"Removing islands smaller than {min_size} pixels")
+
+    # find all the islands
+    lines = [[e for e in l] for l in pixels]
+    islands = find_islands(lines, ignore_islands_along_border=ignore_islands_along_border, island_value=island_value)
+
+    # sort islands (which is a list of list) by len of each island
+    islands.sort(key=lambda i: len(i), reverse=True)
+
+    # remove all other islands
+    removed_count = 0
+    for island in islands:
+        if len(island) < min_size:
+            removed_count += 1
+            for x, y in island:
+                pixels[y][x] = 0 if island_value == 1 else 1
+
+    print(f"Removed {removed_count} tiny islands")
+
 
 
 def ramer_douglas_peucker(points, epsilon):
@@ -546,7 +569,7 @@ def sublist_exists(lst, sub_lst):
 
     return sub_lst_str in lst_extended_str
 
-def find_islands(grid, callback=None, ignore_islands_along_border=False):
+def find_islands(grid, callback=None, ignore_islands_along_border=False, island_value=1):
     """
     Given a grid of 0s and 1s, finds all "islands" of 1s:
     00000000
@@ -558,6 +581,8 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False):
     :param grid: a 2D array of 0s and 1s
     :param callback: a function that will be called with each island found
     :param ignore_islands_along_border: if True, islands that touch the border of the grid will be ignored
+    :param island_value: the value that represents an island in the grid (1 or 0)
+
     Returns either a list of islands, or a list of Trues if a callback was provided
     """
     visited1 = set()
@@ -569,12 +594,14 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False):
                 island = set()
                 queue = [(i, j)]
                 touched_border = False
+
+                # to prevent memory from getting too big and lookups from taking too long,
+                # we maintain two visited sets, we check if we've visited a
+                # location by checking either, and drain them offset
                 if len(islands) % 160 == 0:
                     visited1 = set()
-                    print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
                 if len(islands) % 160 == 80:
                     visited2 = set()
-                    print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
                 while queue:
                     x, y = queue.pop(0)
                     if (x, y) not in visited1 and (x, y) not in visited2:
@@ -582,7 +609,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False):
                         visited2.add((x, y))
                         island.add((y, x))
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                            if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
+                            if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == island_value:
                                 queue.append((x + dx, y + dy))
                         if x == 0 or y == 0 or x == len(grid) - 1 or y == len(grid[0]) - 1:
                             touched_border = True

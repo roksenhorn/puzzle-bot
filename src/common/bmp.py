@@ -4,10 +4,13 @@ from typing import List, Tuple
 from common import util
 
 
-SEG_THRESH = (125*3)
+BMP_WIDTH = 1500
+SEG_THRESH = 135
+WHITE_PIECES = True
+MIN_PIECE_DIM = 125*125
 
 
-def segment(input_photo_filename, output_path=None, width=1500, white_pieces=True, threshold=SEG_THRESH, clean=True):
+def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_pieces=WHITE_PIECES, threshold=SEG_THRESH, clean=True):
     """
     Takes in a photo of one or more puzzle pieces
     Generates a binary image that is slightly cleaned up
@@ -22,7 +25,7 @@ def segment(input_photo_filename, output_path=None, width=1500, white_pieces=Tru
     threshold: the threshold for the binary image
     clean: whether to clean up the image iwth some post-processing
     """
-    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, max_width=width)
+    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, threshold=threshold, max_width=width)
     if clean:
         _clean(bw_pixels, width, height)
     if output_path:
@@ -31,34 +34,11 @@ def segment(input_photo_filename, output_path=None, width=1500, white_pieces=Tru
 
 
 def _clean(bw_pixels, width, height):
-    _remove_small_islands(bw_pixels)
+    # remove debris that is tinier than the size of a piece
+    util.remove_small_islands(bw_pixels, min_size=MIN_PIECE_DIM)
+
+    # clean up hair, hanging chads, and other stragglers along the border
     _remove_stragglers(bw_pixels, width, height)
-
-
-def _remove_small_islands(pixels) -> None:
-    """
-    Find and remove all islands of pixels that are smaller than some set number of pixels
-    """
-    # find all the islands
-    lines = [[e for e in l] for l in pixels]
-    islands = util.find_islands(lines, ignore_islands_along_border=False)
-
-    # sort islands (which is a list of list) by len of each island
-    islands.sort(key=lambda i: len(i), reverse=True)
-
-    # remove all islands that are less than 1/4 the size of the biggest island
-    min_size = len(islands[0]) // 4
-    print(f"Removing islands smaller than {min_size} pixels")
-
-    # remove all other islands
-    removed_count = 0
-    for island in islands:
-        if len(island) < min_size:
-            removed_count += 1
-            for x, y in island:
-                pixels[y][x] = 0
-
-    print(f"Removed {removed_count} tiny islands")
 
 
 def _remove_stragglers(pixels, width, height) -> bool:
