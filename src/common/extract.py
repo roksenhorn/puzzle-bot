@@ -7,21 +7,22 @@ from common import util
 PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
 
-def extract_pieces(input_path, output_path, start_id):
+def extract_pieces(args):
     """
     Returns how many pieces were extracted
     """
+    input_path, output_path, unique_id = args
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def found_island(island, i):
-        return clean_and_save_piece(i + start_id, island, output_path)
+        return clean_and_save_piece(unique_id, i + 1, island, output_path)
 
     islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
     print(f"Extracted {len(islands)} pieces from {input_path.split('/')[-1]}")
     return len(islands)
 
 
-def clean_and_save_piece(piece_id, piece_coordinates, output_path):
+def clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
     if len(piece_coordinates) < 100:
         return False
 
@@ -50,5 +51,5 @@ def clean_and_save_piece(piece_id, piece_coordinates, output_path):
 
     img = PIL.Image.new('1', (width, height))
     img.putdata([pixel for row in pixels for pixel in row])
-    img.save(os.path.join(output_path, f'{piece_id}.bmp'))
+    img.save(os.path.join(output_path, f'{unique_id}_{piece_id}.bmp'))
     return True

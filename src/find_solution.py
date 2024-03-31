@@ -88,11 +88,20 @@ def extract_all(input_path, output_path, id):
         fs = [f for f in os.listdir(input_path) if re.match(r'[0-9]+\.bmp', f)]
         id = 1
 
+    args = []
     for f in fs:
         input_img_path = os.path.join(input_path, f)
         output_img_path = os.path.join(output_path)
-        print(f"> Extracting image {input_img_path} into {output_img_path}")
-        id += extract.extract_pieces(input_img_path, output_path, start_id=id)
+        unique_id = id
+        args.append([input_img_path, output_img_path, unique_id])
+        id += 1
+
+    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
+        pool.map(extract.extract_pieces, args)
+
+    # finally, rename all files to be 1.bmp, 2.bmp, ...
+    for i, f in enumerate(os.listdir(output_path)):
+        os.rename(os.path.join(output_path, f), os.path.join(output_path, f'{i + 1}.bmp'))
 
 
 def vectorize(input_path, output_path, id, serialize):

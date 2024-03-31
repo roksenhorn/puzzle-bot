@@ -5,7 +5,7 @@ from common import util
 
 
 BMP_WIDTH = 1200
-CROP_ALL_SIDES_BY = 175
+CROP_ALL_SIDES_BY = 140
 MIN_PIECE_AREA = 110*110
 
 WHITE_PIECES = True
