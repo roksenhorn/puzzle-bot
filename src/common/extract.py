@@ -11,15 +11,13 @@ def extract_pieces(input_path, output_path, start_id):
     """
     Returns how many pieces were extracted
     """
-    print(f"Loading {input_path.split('/')[-1]}...")
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
     def found_island(island, i):
         return clean_and_save_piece(i + start_id, island, output_path)
 
-    print(f"Extracting pieces from bitmap...")
     islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
-    print(f"Found {len(islands)} pieces")
+    print(f"Extracted {len(islands)} pieces from {input_path.split('/')[-1]}")
     return len(islands)
 
 
@@ -34,10 +32,9 @@ def clean_and_save_piece(piece_id, piece_coordinates, output_path):
     minx, miny, maxx, maxy = min(xs), min(ys), max(xs), max(ys)
     width = (maxx - minx + 1) + (2 * BORDER_WIDTH_PX)
     height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
-    print(f"{width} x {height}")
 
     if width < 0.26 * height or height < 0.25 * width:
-        print(f"Skipping piece {piece_id} because it is too thin")
+        # print(f"Skipping piece {piece_id} because it is too thin")
         return False
 
     pixels = []

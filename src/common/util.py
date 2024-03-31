@@ -39,13 +39,16 @@ def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_widt
     """
     with Image.open(path) as img:
         if max_width is not None and img.size[0] > max_width:
-            img.thumbnail((max_width, img.size[1]))
+            try:
+                img.thumbnail((max_width, img.size[1]))
+            except Exception as e:
+                print(f"Error resizing {path}")
+                raise e
             if crop_by:
                 img = img.crop((crop_by, crop_by, img.size[0] - crop_by, img.size[1] - crop_by))
 
         # Get image data as a 1D array of pixels
         width, height = img.size
-        print(f"Image size: {width} x {height}")
         pixels = list(img.getdata())
 
     if remove_hot_pink:
@@ -79,8 +82,6 @@ def remove_small_islands(pixels, min_size, ignore_islands_along_border=False, is
     """
     Find and remove all islands of pixels that are smaller than some set number of pixels
     """
-    print(f"Removing islands smaller than {min_size} pixels")
-
     # find all the islands
     lines = [[e for e in l] for l in pixels]
     islands = find_islands(lines, ignore_islands_along_border=ignore_islands_along_border, island_value=island_value)
@@ -95,9 +96,6 @@ def remove_small_islands(pixels, min_size, ignore_islands_along_border=False, is
             removed_count += 1
             for x, y in island:
                 pixels[y][x] = 0 if island_value == 1 else 1
-
-    print(f"Removed {removed_count} tiny islands")
-
 
 
 def ramer_douglas_peucker(points, epsilon):
@@ -625,11 +623,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False, island_
                             touched_border = True
 
                 if ignore_islands_along_border and touched_border:
-                    print(f"\t > Ignoring island {len(islands)} because it was along the border")
                     continue
-
-                if len(island) > 100:
-                    print(f"\t > {len(island)} pixels in island {len(islands)}")
 
                 if callback:
                     ok = callback(island, len(islands))
@@ -637,7 +631,6 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False, island_
                         islands.append(True)
                 else:
                     islands.append(island)
-    print(f"Found {len(islands)} islands")
     return islands
 
 

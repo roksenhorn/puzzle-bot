@@ -32,7 +32,7 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_piece
     threshold: the threshold for the binary image
     clean: whether to clean up the image iwth some post-processing
     """
-    print(f"> Turning photo `{input_photo_filename}` into segmented BMP: {output_path}")
+    print(f"> Segmenting photo `{input_photo_filename}` into `{output_path}`")
     bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, threshold=threshold, max_width=width, crop_by=CROP_ALL_SIDES_BY if crop else 0, remove_hot_pink=True)
     if clean:
         _clean(bw_pixels, width, height)
