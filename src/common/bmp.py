@@ -4,13 +4,20 @@ from typing import List, Tuple
 from common import util
 
 
-BMP_WIDTH = 1500
-SEG_THRESH = 185
+BMP_WIDTH = 1200
+CROP_ALL_SIDES_BY = 175
+MIN_PIECE_AREA = 110*110
+
 WHITE_PIECES = True
-MIN_PIECE_DIM = 125*125
+SEG_THRESH = 180  # for white pieces, raise this to cut tighter into the border
 
 
-def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_pieces=WHITE_PIECES, threshold=SEG_THRESH, clean=True):
+def photo_to_bmp(args):
+    input_photo_filename, output_bmp_filename = args
+    segment(input_photo_filename, output_bmp_filename, clean=True)
+
+
+def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_pieces=WHITE_PIECES, threshold=SEG_THRESH, crop=True, clean=True):
     """
     Takes in a photo of one or more puzzle pieces
     Generates a binary image that is slightly cleaned up
@@ -25,7 +32,8 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_piece
     threshold: the threshold for the binary image
     clean: whether to clean up the image iwth some post-processing
     """
-    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, threshold=threshold, max_width=width, remove_hot_pink=True)
+    print(f"> Turning photo `{input_photo_filename}` into segmented BMP: {output_path}")
+    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, threshold=threshold, max_width=width, crop_by=CROP_ALL_SIDES_BY if crop else 0, remove_hot_pink=True)
     if clean:
         _clean(bw_pixels, width, height)
     if output_path:
@@ -35,7 +43,7 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_piece
 
 def _clean(bw_pixels, width, height):
     # remove debris that is tinier than the size of a piece
-    util.remove_small_islands(bw_pixels, min_size=MIN_PIECE_DIM)
+    util.remove_small_islands(bw_pixels, min_size=MIN_PIECE_AREA)
 
     # clean up hair, hanging chads, and other stragglers along the border
     _remove_stragglers(bw_pixels, width, height)

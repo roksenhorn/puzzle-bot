@@ -61,23 +61,21 @@ def bmp_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
-    MAX_WIDTH = 1500
-
     if id:
         fs = [f'{id}.jpeg']
     else:
-        fs = os.listdir(input_path)
+        fs = [f for f in os.listdir(input_path) if re.match(r'.*\.jpe?g', f)]
         id = 1
 
+    args = []
     for f in fs:
-        if re.match(r'.*\.jpe?g', f):
-            input_img_path = os.path.join(input_path, f)
-            output_img_path = os.path.join(output_path, f'{id}.bmp')
+        input_img_path = os.path.join(input_path, f)
+        output_img_path = os.path.join(output_path, f'{id}.bmp')
+        args.append([input_img_path, output_img_path])
+        id += 1
 
-            print(f"> Turning {input_img_path} into {output_img_path}")
-            bmp.segment(input_img_path, output_img_path, width=MAX_WIDTH, clean=True)
-
-            id += 1
+    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
+        pool.map(bmp.photo_to_bmp, args)
 
 
 def extract_all(input_path, output_path, id):
@@ -87,15 +85,14 @@ def extract_all(input_path, output_path, id):
     if id:
         fs = [f'{id}.bmp']
     else:
-        fs = os.listdir(input_path)
+        fs = [f for f in os.listdir(input_path) if re.match(r'[0-9]+\.bmp', f)]
         id = 1
 
     for f in fs:
-        if re.match(r'[0-9]+\.bmp', f):
-            input_img_path = os.path.join(input_path, f)
-            output_img_path = os.path.join(output_path)
-            print(f"> Extracting image {input_img_path} into {output_img_path}")
-            id += extract.extract_pieces(input_img_path, output_path, start_id=id)
+        input_img_path = os.path.join(input_path, f)
+        output_img_path = os.path.join(output_path)
+        print(f"> Extracting image {input_img_path} into {output_img_path}")
+        id += extract.extract_pieces(input_img_path, output_path, start_id=id)
 
 
 def vectorize(input_path, output_path, id, serialize):

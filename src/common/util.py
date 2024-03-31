@@ -33,13 +33,15 @@ def load_binary_image(path):
     return binary_pixels, width, height
 
 
-def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None, remove_hot_pink=False):
+def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None, crop_by=0, remove_hot_pink=False):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
         if max_width is not None and img.size[0] > max_width:
             img.thumbnail((max_width, img.size[1]))
+            if crop_by:
+                img = img.crop((crop_by, crop_by, img.size[0] - crop_by, img.size[1] - crop_by))
 
         # Get image data as a 1D array of pixels
         width, height = img.size
