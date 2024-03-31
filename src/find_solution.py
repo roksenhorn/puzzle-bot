@@ -33,7 +33,7 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
         # wipe any directories we'll act on, except 0 which is the input
-        if i != 0 and i > start_at_step + 1 and i < stop_before_step:
+        if i != 0 and i > start_at_step and i <= stop_before_step:
             for f in os.listdir(os.path.join(path, d)):
                 os.remove(os.path.join(path, d, f))
 
@@ -42,7 +42,6 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
 
     if start_at_step <= 1 and stop_before_step > 1:
         extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
-        # segment_each(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if start_at_step <= 2 and stop_before_step > 2:
         vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
@@ -74,11 +73,9 @@ def bmp_all(input_path, output_path, id):
         if re.match(r'.*\.jpe?g', f):
             input_img_path = os.path.join(input_path, f)
             output_img_path = os.path.join(output_path, f'{id}.bmp')
+
             print(f"> Turning {input_img_path} into {output_img_path}")
-            pixels, w, h = util.binary_pixel_data_for_photo(input_img_path, white_pieces=True, max_width=MAX_WIDTH)
-            img = PIL.Image.new('1', (w, h))
-            img.putdata([pixel for row in pixels for pixel in row])
-            img.save(os.path.join(output_path, f'{id}.bmp'))
+            segment.segment(input_img_path, output_img_path, width=MAX_WIDTH, clean=True)
 
             id += 1
 
@@ -100,33 +97,6 @@ def extract_all(input_path, output_path, id):
             print(f"> Extracting image {input_img_path} into {output_img_path}")
             extract.extract_pieces(input_img_path, output_path)
             id += 1
-
-
-def segment_each(input_path, output_path, id):
-    """
-    Loads each image in the input directory, segments it into a black & white bitmap in the output directory
-    """
-    print(f"\n{util.RED}### Segmenting ###{util.WHITE}\n")
-
-    start_time = time.time()
-    i = id if id is not None else 1
-    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-        results = []
-        while os.path.exists(os.path.join(input_path, f'{i}.jpeg')):
-            input_img_path = os.path.join(input_path, f'{i}.jpeg')
-            output_img_path = os.path.join(output_path, f'{i}.bmp')
-            print(f"> Segmenting image {input_img_path} into {output_img_path}")
-            results.append(pool.apply_async(segment.segment, (input_img_path, output_img_path)))
-
-            i += 1
-            if id is not None:
-                break
-
-        for r in results:
-            r.get()
-
-    duration = time.time() - start_time
-    print(f"Segmenting took {round(duration, 2)} seconds ({round(duration/i, 2)} seconds per image)")
 
 
 def vectorize(input_path, output_path, id, serialize):

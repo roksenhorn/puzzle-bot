@@ -5,73 +5,34 @@ from common import util
 
 
 SEG_THRESH = (125*3)
-SCALE_BY = 0.12
 
 
-def segment(filename, output_path=None, scale_by=SCALE_BY,
-            threshold=SEG_THRESH, clean_and_crop=True):
+def segment(input_photo_filename, output_path=None, width=1500, white_pieces=True, threshold=SEG_THRESH, clean=True):
     """
-    Extracts a darker puzzle piece from a bright background
+    Takes in a photo of one or more puzzle pieces
+    Generates a binary image that is slightly cleaned up
     Removes dust and debris from the image
     Scales the binary image by the provided factor
 
-    Pixel values of 1 = puzzle piece
-    Pixel values of 0 = background
-
     If an output path is provided, this function saves the resulting bitmap
     Returns the pixels and dimensions
+
+    width: the maximum width of the output image
+    white_pieces: whether the pieces are white on a black background (True) or black on a white background (False)
+    threshold: the threshold for the binary image
+    clean: whether to clean up the image iwth some post-processing
     """
-    rgb_pixels, width, height = _load(filename, scale_by)
-    bw_pixels = _segment(rgb_pixels, width, height, threshold)
-    if clean_and_crop:
-        width, height = _clean_and_crop(bw_pixels, width, height)
+    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, max_width=width)
+    if clean:
+        _clean(bw_pixels, width, height)
     if output_path:
         _save(output_path, bw_pixels, width, height)
     return (bw_pixels, width, height)
 
 
-def _load(filename, scale_by) -> List[Tuple[int, int, int]]:
-    """
-    Loads an image file and returns a list of pixels, where each pixel is a tuple of (r, g, b) values
-    """
-    with Image.open(filename) as img:
-        width, height = img.size
-
-        # resize to a maximum dimension
-        width = round(scale_by * width)
-        height = round(scale_by * height)
-        img = img.resize((width, height))
-
-        rgb_pixels = list(img.getdata())
-
-    return rgb_pixels, width, height
-
-
-def _segment(rgb_pixels, width, height, threshold) -> None:
-    """
-    Segments the image into black and white pixels
-    """
-    bw_pixels = []
-
-    # Convert pixels to 0 or 1
-    for i, (pixel_r, pixel_g, pixel_b) in enumerate(rgb_pixels):
-        x = i % width
-        y = i // width
-        if y >= len(bw_pixels):
-            bw_pixels.append([])
-        row = bw_pixels[y]
-        brightness = 0 if (pixel_r + pixel_g + pixel_b) > threshold else 1
-        row.append(brightness)
-        bw_pixels[y] = row
-
-    return bw_pixels
-
-
-def _clean_and_crop(bw_pixels, width, height):
+def _clean(bw_pixels, width, height):
     _remove_small_islands(bw_pixels)
     _remove_stragglers(bw_pixels, width, height)
-    width, height = _crop(bw_pixels, width, height)
-    return width, height
 
 
 def _remove_small_islands(pixels) -> None:
@@ -80,18 +41,24 @@ def _remove_small_islands(pixels) -> None:
     """
     # find all the islands
     lines = [[e for e in l] for l in pixels]
-    islands = util.find_islands(lines, ignore_islands_along_border=True)
+    islands = util.find_islands(lines, ignore_islands_along_border=False)
 
     # sort islands (which is a list of list) by len of each island
     islands.sort(key=lambda i: len(i), reverse=True)
 
-    # keep the biggest
-    islands.pop(0)
+    # remove all islands that are less than 1/4 the size of the biggest island
+    min_size = len(islands[0]) // 4
+    print(f"Removing islands smaller than {min_size} pixels")
 
     # remove all other islands
+    removed_count = 0
     for island in islands:
-        for x, y in island:
-            pixels[y][x] = 0
+        if len(island) < min_size:
+            removed_count += 1
+            for x, y in island:
+                pixels[y][x] = 0
+
+    print(f"Removed {removed_count} tiny islands")
 
 
 def _remove_stragglers(pixels, width, height) -> bool:
@@ -142,44 +109,6 @@ def _remove_stragglers(pixels, width, height) -> bool:
         return _remove_stragglers(pixels, width, height)
 
     return False
-
-
-def _crop(pixels, width, height) -> None:
-    # crop from the top
-    while not any(pixels[1]):
-        pixels.pop(1)
-        height -= 1
-
-    # crop from the bottom
-    while not any(pixels[-2]):
-        pixels.pop(-2)
-        height -= 1
-
-    # crop from the left
-    continue_cropping_left = True
-    while continue_cropping_left:
-        for y in range(height):
-            if pixels[y][1] == 1:
-                continue_cropping_left = False
-                break
-        if continue_cropping_left:
-            for y in range(height):
-                pixels[y] = pixels[y][1:]
-            width -= 1
-
-    # crop from the right
-    continue_cropping_right = True
-    while continue_cropping_right:
-        for y in range(height):
-            if pixels[y][-2] == 1:
-                continue_cropping_right = False
-                break
-        if continue_cropping_right:
-            for y in range(height):
-                pixels[y] = pixels[y][:-1]
-            width -= 1
-
-    return width, height
 
 
 def _save(output_path, bw_pixels, width, height):

@@ -37,6 +37,8 @@ def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
+    THRESHOLD=120
+
     with Image.open(path) as img:
         if max_width is not None and img.size[0] > max_width:
             img.thumbnail((max_width, img.size[1]))
@@ -52,9 +54,9 @@ def binary_pixel_data_for_photo(path, white_pieces=True, max_width=None):
         if type(pixel) == tuple:
             pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
             if white_pieces:
-                pixel = 0 if pixel_val <= 100 else 1
+                pixel = 0 if pixel_val <= THRESHOLD else 1
             else:
-                pixel = 0 if pixel_val > 100 else 1
+                pixel = 0 if pixel_val > THRESHOLD else 1
         x = i % width
         y = i // width
         if x == 0:
@@ -566,6 +568,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False):
             if grid[i][j] == 1 and (i, j) not in visited1 and (i, j) not in visited2:
                 island = set()
                 queue = [(i, j)]
+                touched_border = False
                 if len(islands) % 160 == 0:
                     visited1 = set()
                     print(f"Visited1: {len(visited1)} pixels \t Visited2: {len(visited2)} pixels")
@@ -581,18 +584,16 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False):
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                             if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == 1:
                                 queue.append((x + dx, y + dy))
-
-                ignore_island = False
-                if ignore_islands_along_border:
-                    for x, y in island:
                         if x == 0 or y == 0 or x == len(grid) - 1 or y == len(grid[0]) - 1:
-                            ignore_island = True
-                            break
-                if ignore_island:
+                            touched_border = True
+
+                if ignore_islands_along_border and touched_border:
                     print(f"\t > Ignoring island {len(islands)} because it was along the border")
                     continue
 
-                print(f"\t > {len(island)} pixels in island {len(islands)}")
+                if len(island) > 100:
+                    print(f"\t > {len(island)} pixels in island {len(islands)}")
+
                 if callback:
                     ok = callback(island, len(islands))
                     if ok:

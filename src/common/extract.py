@@ -11,15 +11,15 @@ def extract_pieces(input_path, output_path=None):
     print(f"Loading {input_path.split('/')[-1]}...")
     pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
 
-    def save_island(island, i):
-        return extract_piece(i + 1, island, output_path)
+    def found_island(island, i):
+        return clean_and_save_piece(i + 1, island, output_path)
 
     print(f"Finding islands...")
-    islands = util.find_islands(pixels, callback=save_island, ignore_islands_along_border=True)
+    islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
     print(f"Found {len(islands)} pieces")
 
 
-def extract_piece(piece_id, piece_coordinates, output_path=None):
+def clean_and_save_piece(piece_id, piece_coordinates, output_path=None):
     if len(piece_coordinates) < 100:
         return False
 
