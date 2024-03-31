@@ -33,7 +33,7 @@ def load_binary_image(path):
     return binary_pixels, width, height
 
 
-def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None):
+def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None, remove_hot_pink=False):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
@@ -45,6 +45,14 @@ def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_widt
         width, height = img.size
         print(f"Image size: {width} x {height}")
         pixels = list(img.getdata())
+
+    if remove_hot_pink:
+        # we are using hot pink duck tape to delineate the border of the table
+        for i, pixel in enumerate(pixels):
+            # red is much stronger than green, red is bright, and blue is at least a bit stronger than green
+            is_hot_pink = pixel[0] > 1.6 * pixel[1] and pixel[0] > 100 and pixel[2] > 1.1 * pixel[1]
+            if is_hot_pink:
+                pixels[i] = (0, 0, 0) if white_pieces else (255, 255, 255)  # turn pink into the same color as the background
 
     # Convert pixels to 0 or 1 2D array
     binary_pixels = np.empty(height, dtype=object)
