@@ -27,6 +27,12 @@ def load_binary_image(path):
         width, height = img.size
         pixels = np.array(img.getdata())
 
+        # if the image is RGB or RGBA, convert to binary
+        if len(pixels[0]) == 3:
+            pixels = np.array([sum(p) / 3 for p in pixels])
+        elif len(pixels[0]) == 4:
+            pixels = np.array([sum(p[:3]) / 3 for p in pixels])
+
     # Reshape to 2D and convert to 1s and 0s
     pixels = pixels.reshape((height, width))
     binary_pixels = np.where(pixels > 0, 1, 0).astype(np.int8)

@@ -50,7 +50,7 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
         deduplicate(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, DEDUPED_DIR))
 
     if start_at_step <= 3 and stop_before_step > 3:
-        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+        vectorize(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
     if start_at_step <= 4 and stop_before_step > 4:
         find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
