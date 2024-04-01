@@ -8,7 +8,6 @@ BMP_WIDTH = 1050
 CROP_ALL_SIDES_BY = 0 # 75
 MIN_PIECE_AREA = 100*100
 
-WHITE_PIECES = True
 SEG_THRESH = 177  # for white pieces, raise this to cut tighter into the border
 
 
@@ -17,7 +16,7 @@ def photo_to_bmp(args):
     segment(input_photo_filename, output_bmp_filename, clean=True)
 
 
-def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_pieces=WHITE_PIECES, threshold=SEG_THRESH, crop=True, clean=True):
+def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=SEG_THRESH, crop=True, clean=True):
     """
     Takes in a photo of one or more puzzle pieces
     Generates a binary image that is slightly cleaned up
@@ -33,7 +32,9 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, white_piece
     clean: whether to clean up the image iwth some post-processing
     """
     print(f"> Segmenting photo `{input_photo_filename}` into `{output_path}`")
-    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename, white_pieces=white_pieces, threshold=threshold, max_width=width, crop_by=CROP_ALL_SIDES_BY if crop else 0, remove_hot_pink=True)
+    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename,
+                                                                threshold=threshold, max_width=width,
+                                                                crop_by=CROP_ALL_SIDES_BY if crop else 0)
     if clean:
         _clean(bw_pixels, width, height)
     if output_path:

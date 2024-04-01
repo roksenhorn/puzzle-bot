@@ -16,7 +16,6 @@ def deduplicate(input_path, output_path):
     # Use the piece location to make sure we're only removing pieces that are physically at the same location
 
     tiny_pieces = {}
-    i = 1
     for f in os.listdir(input_path):
         f = os.path.join(input_path, f)
         with Image.open(f) as img:
@@ -25,10 +24,6 @@ def deduplicate(input_path, output_path):
 
             # pad all to the same size
             img = img.crop((0, 0, 70, 70))
-
-            # save the tiny image to output_path/tiny_{f}.bmp
-            img.save(os.path.join(output_path, f'tiny_{i}.bmp'))
-            i += 1
 
             tiny_pieces[f] = np.array(img.getdata())
 

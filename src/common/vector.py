@@ -27,7 +27,7 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 # scale pixel offsets depending on how big the BMPs are
 # 1.0 is tuned for around 100 pixels wide
-SCALAR = 4.0
+SCALAR = 2.5
 
 
 def load_and_vectorize(args):
@@ -65,7 +65,10 @@ class Candidate(object):
         midangle = util.angle_between(v_i, util.midpoint(p_h, p_j))
         offset_from_center = util.compare_angles(midangle, a_ic)
 
-        is_pointed_toward_center = offset_from_center < angle_hij / 2 or abs(offset_from_center) <= (55 * math.pi/180)
+        is_pointed_toward_center = offset_from_center < angle_hij / 2
+        if not is_pointed_toward_center and angle_hij < 90 * math.pi/180:
+            # for narrow corners, they might not be pointed directly toward the center but could still be close
+            is_pointed_toward_center = abs(offset_from_center) <= (45 * math.pi/180)
         is_valid_angle_width = angle_hij >= CORNER_MIN_ANGLE_DEG * math.pi/180 and angle_hij <= CORNER_MAX_ANGLE_DEG * math.pi/180
 
         if not is_pointed_toward_center or not is_valid_angle_width:
@@ -77,10 +80,13 @@ class Candidate(object):
         _, stdev_h = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i-vec_len_for_stdev-vec_offset, i-vec_offset-1))
         _, stdev_j = util.colinearity(from_point=vertices[i], to_points=util.slice(vertices, i+vec_offset+1, i+vec_len_for_stdev+vec_offset))
         stdev = stdev_h + stdev_j
-        curve_score = util.curve_score(points=util.slice(vertices, i-vec_len_for_curve, i+vec_len_for_curve), debug=debug)
+
+        points_around = util.slice(vertices, i-vec_len_for_curve, i+vec_len_for_curve)
+        curve_score = util.curve_score(points=points_around, debug=debug)
 
         candidate = Candidate(v=v_i, i=i, centroid=centroid, angular_width=angle_hij, offset_from_center=offset_from_center, midangle=midangle, stdev=stdev, curve_score=curve_score)
         if debug:
+            print(f"actually pointed toward center: {offset_from_center < angle_hij / 2}, pointed close enough toward center: {abs(offset_from_center) <= (55 * math.pi/180)}")
             print(f"stdev of spokes: {stdev} = {stdev_h} + {stdev_j}, {vec_len_for_stdev}px out")
             print(f"v: {v_i}, c: {centroid} => {round(a_ic * 180 / math.pi)}°")
             print(f"width: {round(angle_hij * 180 / math.pi)}°, mid-angle ray: {round(midangle * 180 / math.pi)}°")
@@ -128,7 +134,7 @@ class Vector(object):
     @staticmethod
     def from_file(filename, id) -> 'Vector':
         # Open image file
-        binary_pixels, width, height = util.load_binary_image(filename)
+        binary_pixels, width, height = util.load_bmp_as_binary_pixels(filename)
         v = Vector(pixels=binary_pixels, width=width, height=height, id=id)
         return v
 
@@ -170,13 +176,15 @@ class Vector(object):
         for i, side in enumerate(self.sides):
             stroke_width = 3.0 if side.is_edge else 1.0
             pts = ' '.join([','.join([str(e) for e in v]) for v in side.vertices])
-            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:{stroke_width}" />'
+            dash = 'stroke-dasharray="6,3"' if side.is_edge else ''
+            svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:{stroke_width}" {dash} />'
         # draw in a small circle for each corner (the first and last vertex for each side)
         for i, side in enumerate(self.sides):
             v = side.vertices[0]
             svg += f'<circle cx="{v[0]}" cy="{v[1]}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
-        svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#990000; stroke-width:0" />'
-        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{50.0}" style="fill:#ff770022; stroke-width:0" />'
+        svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#444444; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{30.0}" style="fill:#ff770022; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
         svg += '</svg>'
         with open(full_svg_path, 'w') as f:
             f.write(svg)
@@ -206,29 +214,6 @@ class Vector(object):
         # Determine border pixels
         border_mask = (center != 0) & ((above == 0) | (below == 0) | (left == 0) | (right == 0))
         self.border[1:-1, 1:-1] = border_mask.astype(np.int8)
-
-        # for row in self.border:
-            # print(''.join(['#' if pixel else '.' for pixel in row]))
-
-        # print("\n\n")
-        # self.border = [[0 for i in range(self.width)] for j in range(self.height)]
-        # for y in range(1, self.height - 1):
-        #     for x in range(1, self.width - 1):
-        #         v = self.pixels[y][x]
-        #         if v == 0:
-        #             continue
-
-        #         neighbors = [
-        #             self.pixels[y - 1][x],  # above
-        #             self.pixels[y + 1][x],  # below
-        #             self.pixels[y][x - 1],  # left
-        #             self.pixels[y][x + 1],  # right
-        #         ]
-        #         if not all(neighbors):
-        #             self.border[y][x] = 1
-        # for row in self.border:
-        #     print(''.join(['#' if pixel else '.' for pixel in row]))
-
 
     def vectorize(self) -> None:
         """
@@ -327,7 +312,7 @@ class Vector(object):
         # to find a corner, we're going to compute the angle between 3 consecutive points
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(self.vertices)):
-            debug = self.vertices[i][1] == 1070
+            debug = self.vertices[i][1] in (2260, 1250)
             candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
             if not candidate or candidate.score() > 3.0:
                 if debug:
@@ -497,6 +482,7 @@ class Vector(object):
         """
         self.sides = []
 
+        # clean up the vertices and determine if any sides are edges
         for i in range(4):
             # yank out all the relevant vertices for this side
             j = (i + 1) % 4
@@ -514,11 +500,19 @@ class Vector(object):
             if vertices[-1] != self.corners[j]:
                 vertices.append(self.corners[j])
 
-            # edges are flat and thus have very little variance from the average line between all points
-            corner_corner_distance = util.distance(vertices[0], vertices[-1])
-            polyline_length = util.polyline_length(vertices)
-            is_edge = polyline_length / corner_corner_distance < 1.015
-            # print(f"Debugging is_edge: {is_edge} ({polyline_length} / {corner_corner_distance}) = {polyline_length / corner_corner_distance}")
+            # is this side an edge?
+            # we see how far from a straight line each vertex is
+            # cases that should compute to being an edge:
+            # - perfectly straight line (=> no cumulative area)
+            # - a perfectly straight line, but with a small defect that leads to some jaggedy edges (=> very small area)
+            # cases that should compute to not an edge:
+            # - a normal looking puzzle piece side with a nub sticking out
+            # - a gentle sloping curve (like the shape of a parenthesis)
+            # - a gentle squiggle (like a sine wave)
+            area = util.normalized_area_between_corners(vertices)
+            is_edge = bool(area < 1.0)
+            # print(f"[{self.id}:{i}] Area: {area} \t => Is Edge: {is_edge}")
+
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
 

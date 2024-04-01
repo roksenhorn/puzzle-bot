@@ -36,7 +36,6 @@ class Orientation(object):
     ZERO_POINTS_LEFT = 3
 
 # dimensions for the puzzle you're solving
-# TODO: this should be taken in as config
 WIDTH = 40
 HEIGHT = 25
 

@@ -12,7 +12,7 @@ def extract_pieces(args):
     Returns how many pieces were extracted
     """
     input_path, output_path, unique_id = args
-    pixels, _, _ = util.binary_pixel_data_for_photo(input_path)
+    pixels, _, _ = util.load_bmp_as_binary_pixels(input_path)
 
     def found_island(island, i):
         return _clean_and_save_piece(unique_id, i + 1, island, output_path)

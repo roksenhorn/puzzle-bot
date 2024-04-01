@@ -19,7 +19,7 @@ BLACK_ON_RED = '\033[30;41m'
 BLACK_ON_GREEN = '\033[30;42m'
 
 
-def load_binary_image(path):
+def load_bmp_as_binary_pixels(path):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
@@ -28,9 +28,7 @@ def load_binary_image(path):
         pixels = np.array(img.getdata())
 
         # if the image is RGB or RGBA, convert to binary
-        if len(pixels[0]) == 3:
-            pixels = np.array([sum(p) / 3 for p in pixels])
-        elif len(pixels[0]) == 4:
+        if type(pixels[0]) != np.int64 and len(pixels[0]) >= 3:
             pixels = np.array([sum(p[:3]) / 3 for p in pixels])
 
     # Reshape to 2D and convert to 1s and 0s
@@ -39,7 +37,7 @@ def load_binary_image(path):
     return binary_pixels, width, height
 
 
-def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_width=None, crop_by=0, remove_hot_pink=False):
+def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
@@ -57,29 +55,40 @@ def binary_pixel_data_for_photo(path, white_pieces=True, threshold=120, max_widt
         width, height = img.size
         pixels = list(img.getdata())
 
-    if remove_hot_pink:
-        # we are using hot pink duck tape to delineate the border of the table
-        for i, pixel in enumerate(pixels):
-            # red is much stronger than green, red is bright, and blue is at least a bit stronger than green
-            is_hot_pink = pixel[0] > 1.6 * pixel[1] and pixel[0] > 100 and pixel[2] > 1.1 * pixel[1]
-            if is_hot_pink:
-                pixels[i] = (0, 0, 0) if white_pieces else (255, 255, 255)  # turn pink into the same color as the background
-
     # Convert pixels to 0 or 1 2D array
+    # turns piece pixels into 1s, background into 0s
+    # turn saturated parts to background color
+    # e.g. we are using hot pink duck tape to delineate the border of the table
+    # we also see lens blur comes across as a saturated blue
+    bg_color = 0
+    piece_color = 1
     binary_pixels = np.empty(height, dtype=object)
-    for i, pixel in enumerate(pixels):
-        if type(pixel) == tuple:
-            pixel_val = (pixel[0] + pixel[1] + pixel[2]) / 3
-            if white_pieces:
-                pixel = 0 if pixel_val <= threshold else 1
-            else:
-                pixel = 0 if pixel_val > threshold else 1
+    for i, rgb in enumerate(pixels):
+        max_p = max(rgb)
+        min_p = min(rgb)
+        saturation = max_p - min_p
+        brightness = 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2]
+
+        # hot pink duck tape
+        is_hot_pink = max_p == rgb[0] and rgb[0] > 230 and min_p < 205
+        # a purplish blue e.g. #9388A3
+        is_blue_blur = rgb[2] == max_p and saturation > 16
+        # a very light orange shadow we see on the _inside_ of some pieces
+        is_light_orange = (brightness >= threshold - 15) and rgb[0] == max_p and saturation > 15
+
+        if is_hot_pink or is_blue_blur:
+            binary_pixel = bg_color
+        elif is_light_orange:
+            binary_pixel = piece_color
+        else:
+            binary_pixel = bg_color if brightness <= threshold else piece_color
         x = i % width
         y = i // width
         if x == 0:
             row = np.empty(width, dtype=np.int8)
             binary_pixels[y] = row
-        binary_pixels[y][x] = 1 if pixel > 0 else 0
+
+        binary_pixels[y][x] = binary_pixel
 
     return binary_pixels, width, height
 
@@ -517,7 +526,7 @@ def curve_score(points, debug=False) -> float:
     if len(points) < 16:
         raise Exception("Need a bunch of points to calculate curve score")
 
-    gap = 5
+    gap = 4
     angles = [counterclockwise_angle_between_vectors(points[i - gap], points[i], points[i + gap]) for i in range(gap, len(points) - gap)]
     avg_angle = average_of_angles(angles)
     angle_deviations = [compare_angles(angle, avg_angle) for angle in angles]
@@ -526,13 +535,13 @@ def curve_score(points, debug=False) -> float:
     # i=0 has 0 weight, i=len-1 has 0 weight, i=len/2 has weight 1.0
     weighted_deviation = 0.0
     mid_i = len(angles) // 2
-    denom = 0.0
+    total_weight = 0.0
     for i, deviation in enumerate(angle_deviations):
         weight = 1 - abs(i - mid_i) / mid_i
         weighted_deviation += abs(deviation) * weight
-        denom += weight
+        total_weight += weight
 
-    normalized_deviation = weighted_deviation / denom
+    normalized_deviation = weighted_deviation / total_weight
     score = 3 * (0.4 - normalized_deviation)
     score = max(min(1.0, score), 0.0)
 
@@ -541,11 +550,11 @@ def curve_score(points, debug=False) -> float:
         print(points)
         print(f"Angle:")
         for a in angles:
-            print(f"\t{round(a * 180/math.pi)}°")
-        print(f"Angle deviations:")
+            print(f"{round(a * 180/math.pi)}°", end="\t")
+        print(f"\nAngle deviations:")
         for d in angle_deviations:
-            print(f"\t{round(d * 180/math.pi)}°")
-        print(f"deviation score: {weighted_deviation} / {denom} = {normalized_deviation}")
+            print(f"{round(d * 180/math.pi)}°", end="\t")
+        print(f"\nDeviation score: {weighted_deviation} / {total_weight} = {normalized_deviation}")
         print(f"Curve score: {score}")
 
     # Aggregate score
@@ -740,3 +749,16 @@ def normalized_ssd(bytes1, bytes2):
     assert len(bytes1) == len(bytes2)
     ssd = np.sum((bytes1 - bytes2) ** 2)
     return ssd / len(bytes1)
+
+
+def normalized_area_between_corners(vertices):
+    """
+    Computes the area enclosed by a list of vertices,
+    considering the area as positive when the points are non-collinear
+    """
+    sum_distances = 0
+    p0 = vertices[0]
+    p1 = vertices[-1]
+    for p in vertices:
+        sum_distances += distance_to_line(point=p, start=p0, end=p1)
+    return sum_distances / len(vertices)
