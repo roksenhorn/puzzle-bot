@@ -6,6 +6,8 @@ from common import util
 
 PIL.Image.MAX_IMAGE_PIXELS = 912340000
 
+MIN_PIECE_AREA = 100 * 100
+
 
 def extract_pieces(args):
     """
@@ -23,7 +25,8 @@ def extract_pieces(args):
 
 
 def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
-    if len(piece_coordinates) < 100:
+    # reject noise in the image that is clearly too small to be a piece
+    if len(piece_coordinates) < MIN_PIECE_AREA:
         return False
 
     # figure out the dimensions of the piece, then pad it with a small border
@@ -34,6 +37,7 @@ def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
     width = (maxx - minx + 1) + (2 * BORDER_WIDTH_PX)
     height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
 
+    # reject islands that are really narrow, like a seem along an edge that was picked up incorrectly
     if width < 0.26 * height or height < 0.25 * width:
         # print(f"Skipping piece {piece_id} because it is too thin")
         return False

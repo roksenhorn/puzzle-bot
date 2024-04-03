@@ -41,15 +41,16 @@ def deduplicate(input_path, output_path):
             visited.add((f2, f1))
 
             ssd = util.normalized_ssd(p1, p2)
-            if ssd < 2000:
-                if ssd > 1000:
-                    print(f"Dupes: {f1} <> {f2}: \t {ssd}")
+            if ssd < 2600:
+                if ssd > 2000:
+                    print(f"Close dupes that make the cut: {f1} <> {f2}: \t {ssd}")
+
                 if f1 < f2:
                     dupes.add(f1)
                 else:
                     dupes.add(f2)
-            elif ssd < 3000:
-                print(f"\t Close: {f1} <> {f2}: \t {ssd}")
+            elif ssd < 3600:
+                print(f"\t Close dupes that missed the cut: {f1} <> {f2}: \t {ssd}")
 
     uniques = set(tiny_pieces.keys()) - dupes
     print(f"Found {len(dupes)} duplicate pieces, resulting in {len(uniques)} unique pieces.")

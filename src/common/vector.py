@@ -169,6 +169,10 @@ class Vector(object):
             return self
 
     def save(self, output_path) -> None:
+        # don't save if it isn't an edge
+        if not self.sides[0].is_edge and not self.sides[1].is_edge and not self.sides[2].is_edge and not self.sides[3].is_edge:
+            return
+
         full_svg_path = os.path.join(output_path, f"{self.id}_full.svg")
         colors = ['cc0000', '999900', '00aa99', '3300bb']
         svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'

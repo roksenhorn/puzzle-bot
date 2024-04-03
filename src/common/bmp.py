@@ -1,3 +1,4 @@
+import time
 from PIL import Image
 from typing import List, Tuple
 
@@ -8,7 +9,7 @@ BMP_WIDTH = 1050
 CROP_ALL_SIDES_BY = 0 # 75
 MIN_PIECE_AREA = 100*100
 
-SEG_THRESH = 177  # for white pieces, raise this to cut tighter into the border
+SEG_THRESH = 165  # for white pieces, raise this to cut tighter into the border
 
 
 def photo_to_bmp(args):
@@ -39,12 +40,13 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=S
         _clean(bw_pixels, width, height)
     if output_path:
         _save(output_path, bw_pixels, width, height)
+
     return (bw_pixels, width, height)
 
 
 def _clean(bw_pixels, width, height):
     # remove debris that is tinier than the size of a piece
-    util.remove_small_islands(bw_pixels, min_size=MIN_PIECE_AREA)
+    # util.remove_small_islands(bw_pixels, min_size=MIN_PIECE_AREA)
 
     # clean up hair, hanging chads, and other stragglers along the border
     _remove_stragglers(bw_pixels, width, height)

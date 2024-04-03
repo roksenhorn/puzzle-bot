@@ -4,7 +4,6 @@ import os
 import time
 import multiprocessing
 import re
-import PIL
 
 from common import bmp, board, connect, dedupe, extract, util, vector
 
@@ -71,14 +70,13 @@ def bmp_all(input_path, output_path, id):
         fs = [f'{id}.jpeg']
     else:
         fs = [f for f in os.listdir(input_path) if re.match(r'.*\.jpe?g', f)]
-        id = 1
 
     args = []
     for f in fs:
         input_img_path = os.path.join(input_path, f)
-        output_img_path = os.path.join(output_path, f'{id}.bmp')
+        output_name = f.split('.')[0]
+        output_img_path = os.path.join(output_path, f'{output_name}.bmp')
         args.append([input_img_path, output_img_path])
-        id += 1
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(bmp.photo_to_bmp, args)
@@ -88,10 +86,12 @@ def extract_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
+    print(f"\n{util.RED}### Extracting pieces from photo bitmaps ###{util.WHITE}\n")
+
     if id:
         fs = [f'{id}.bmp']
     else:
-        fs = [f for f in os.listdir(input_path) if re.match(r'[0-9]+\.bmp', f)]
+        fs = [f for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
         id = 1
 
     args = []
