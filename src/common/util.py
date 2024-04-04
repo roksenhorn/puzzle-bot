@@ -67,21 +67,11 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
         max_p = max(rgb)
         min_p = min(rgb)
         saturation = max_p - min_p
-        brightness = 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2]
+        brightness = sum(rgb) // 3
 
-        # hot pink duck tape
-        is_hot_pink = max_p == rgb[0] and rgb[0] > 230 and min_p < 205
-        # a purplish blue e.g. #9388A3
-        is_blue_blur = rgb[2] == max_p and saturation > 16
-        # a very light orange shadow we see on the _inside_ of some pieces
-        is_light_orange = (brightness >= threshold - 15) and rgb[0] == max_p and saturation > 15
+        # is_hot_pink = max_p == rgb[0] and rgb[0] > 230 and min_p < 205
 
-        if is_hot_pink or is_blue_blur:
-            binary_pixel = bg_color
-        elif is_light_orange:
-            binary_pixel = piece_color
-        else:
-            binary_pixel = bg_color if brightness <= threshold else piece_color
+        binary_pixel = bg_color if brightness <= threshold else piece_color
         x = i % width
         y = i // width
         if x == 0:

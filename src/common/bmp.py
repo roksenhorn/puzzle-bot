@@ -9,7 +9,7 @@ BMP_WIDTH = 1050
 CROP_ALL_SIDES_BY = 0 # 75
 MIN_PIECE_AREA = 100*100
 
-SEG_THRESH = 165  # for white pieces, raise this to cut tighter into the border
+SEG_THRESH = 145  # for white pieces, raise this to cut tighter into the border
 
 
 def photo_to_bmp(args):
