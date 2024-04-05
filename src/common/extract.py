@@ -29,13 +29,16 @@ def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
     if len(piece_coordinates) < MIN_PIECE_AREA:
         return False
 
-    # figure out the dimensions of the piece, then pad it with a small border
-    BORDER_WIDTH_PX = 1
     xs = [x for (x, _) in piece_coordinates]
     ys = [y for (_, y) in piece_coordinates]
     minx, miny, maxx, maxy = min(xs), min(ys), max(xs), max(ys)
-    width = (maxx - minx + 1) + (2 * BORDER_WIDTH_PX)
-    height = (maxy - miny + 1) + (2 * BORDER_WIDTH_PX)
+    width = maxx - minx + 1
+    height = maxy - miny + 1
+
+    # pad the image with a border
+    BORDER_WIDTH_PX = 1
+    width += (2 * BORDER_WIDTH_PX)
+    height += (2 * BORDER_WIDTH_PX)
 
     # reject islands that are really narrow, like a seem along an edge that was picked up incorrectly
     if width < 0.26 * height or height < 0.25 * width:
@@ -52,6 +55,9 @@ def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
         xx = x - minx + BORDER_WIDTH_PX
         yy = y - miny + BORDER_WIDTH_PX
         pixels[yy][xx] = 1
+
+    # clean up any thin strands of pixels like hairs or dust
+    util.remove_stragglers(pixels, width, height)
 
     img = PIL.Image.new('1', (width, height))
     img.putdata([pixel for row in pixels for pixel in row])

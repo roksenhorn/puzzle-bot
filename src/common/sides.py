@@ -63,7 +63,7 @@ class Side(object):
             return 1000
 
         # sides must be roughly the same length
-        d_scale = 1.0 - (self.v_length / side.v_length)
+        d_scale = 1.0 - (self.length / side.length)
         if abs(d_scale) > SIDE_MAX_LENGTH_DISCREPANCY:
             # if render:
             #     print(f"\tNO MATCH: scale is too different!!!!!!!!!! {d_scale}")

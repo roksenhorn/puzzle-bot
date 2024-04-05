@@ -44,7 +44,7 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
     with Image.open(path) as img:
         if max_width is not None and img.size[0] > max_width:
             try:
-                img.thumbnail((max_width, img.size[1]))
+                img.thumbnail((max_width, img.size[1]), resample=Image.NEAREST)
             except Exception as e:
                 print(f"Error resizing {path}")
                 raise e
@@ -64,13 +64,7 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
     piece_color = 1
     binary_pixels = np.empty(height, dtype=object)
     for i, rgb in enumerate(pixels):
-        max_p = max(rgb)
-        min_p = min(rgb)
-        saturation = max_p - min_p
         brightness = sum(rgb) // 3
-
-        # is_hot_pink = max_p == rgb[0] and rgb[0] > 230 and min_p < 205
-
         binary_pixel = bg_color if brightness <= threshold else piece_color
         x = i % width
         y = i // width
@@ -752,3 +746,53 @@ def normalized_area_between_corners(vertices):
     for p in vertices:
         sum_distances += distance_to_line(point=p, start=p0, end=p1)
     return sum_distances / len(vertices)
+
+
+def remove_stragglers(pixels, width, height) -> bool:
+    """
+    Given an array of binary pixels, removes any pixels that are only connected to one other pixel
+    Returns True if any were removed
+    """
+    removed = False
+
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            v = pixels[y][x]
+            if v != 1:
+                continue
+
+            # All 8 neighbors
+            above_left = pixels[y - 1][x - 1]
+            above = pixels[y - 1][x]
+            above_right = pixels[y - 1][x + 1]
+            right = pixels[y][x + 1]
+            below_right = pixels[y + 1][x + 1]
+            below = pixels[y + 1][x]
+            below_left = pixels[y + 1][x - 1]
+            left = pixels[y][x - 1]
+            neighbors = [
+                above_left,
+                above,
+                above_right,
+                right,
+                below_right,
+                below,
+                below_left,
+                left,
+            ]
+            borders = [True for n in neighbors if n == 1]
+            if len(borders) <= 1:
+                # straggler only connected by one
+                pixels[y][x] = 0
+                removed = True
+
+            # if there are only 2 neighbors, and they are not adjacent (e.g. no [1, 1] subset in the list), then these
+            # are one-pixel-wide bridges that should be removed
+            if len(borders) == 2 and not sublist_exists(borders, [1, 1]):
+                pixels[y][x] = 0
+                removed = True
+
+    if removed:
+        return remove_stragglers(pixels, width, height)
+
+    return False

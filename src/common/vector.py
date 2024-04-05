@@ -12,7 +12,7 @@ from common import sides, util
 SIMPLIFY_EPSILON = 0 #1.5
 
 # We'll merge vertices closer than this
-MERGE_IF_CLOSER_THAN_PX = 1.75
+MERGE_IF_CLOSER_THAN_PX = 2.25
 
 # Opposing sides must be "parallel" within this threshold (in degrees)
 SIDE_PARALLEL_THRESHOLD_DEG = 32
@@ -27,7 +27,7 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 # scale pixel offsets depending on how big the BMPs are
 # 1.0 is tuned for around 100 pixels wide
-SCALAR = 2.5
+SCALAR = 5.0
 
 
 def load_and_vectorize(args):
@@ -169,26 +169,23 @@ class Vector(object):
             return self
 
     def save(self, output_path) -> None:
-        # don't save if it isn't an edge
-        if not self.sides[0].is_edge and not self.sides[1].is_edge and not self.sides[2].is_edge and not self.sides[3].is_edge:
-            return
-
+        d = SCALAR / 2.0  # scale the SVG down by this denominator
         full_svg_path = os.path.join(output_path, f"{self.id}_full.svg")
         colors = ['cc0000', '999900', '00aa99', '3300bb']
         svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-        svg += f'<svg width="{3 * self.width}" height="{3 * self.height}" viewBox="-10 -10 {20 + self.width} {20 + self.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+        svg += f'<svg width="{3 * self.width / d}" height="{3 * self.height / d}" viewBox="-10 -10 {20 + self.width / d} {20 + self.height /d}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
         for i, side in enumerate(self.sides):
             stroke_width = 3.0 if side.is_edge else 1.0
-            pts = ' '.join([','.join([str(e) for e in v]) for v in side.vertices])
+            pts = ' '.join([','.join([str(e / d) for e in v]) for v in side.vertices])
             dash = 'stroke-dasharray="6,3"' if side.is_edge else ''
             svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:{stroke_width}" {dash} />'
         # draw in a small circle for each corner (the first and last vertex for each side)
         for i, side in enumerate(self.sides):
             v = side.vertices[0]
-            svg += f'<circle cx="{v[0]}" cy="{v[1]}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
-        svg += f'<circle cx="{self.centroid[0]}" cy="{self.centroid[1]}" r="{1.0}" style="fill:#444444; stroke-width:0" />'
-        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{30.0}" style="fill:#ff770022; stroke-width:0" />'
-        svg += f'<circle cx="{self.incenter[0]}" cy="{self.incenter[1]}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
+            svg += f'<circle cx="{v[0] / d}" cy="{v[1] / d}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
+        svg += f'<circle cx="{self.centroid[0] / d}" cy="{self.centroid[1] / d}" r="{1.0}" style="fill:#444444; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
+        svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
         svg += '</svg>'
         with open(full_svg_path, 'w') as f:
             f.write(svg)
