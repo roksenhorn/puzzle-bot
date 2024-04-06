@@ -6,10 +6,10 @@ from common import util
 
 
 BMP_WIDTH = 2100
-CROP_ALL_SIDES_BY = 0
+CROP_TRBL = (40, 220, 40, 220)
 MIN_PIECE_AREA = 200*200
 
-SEG_THRESH = 145  # for white pieces, raise this to cut tighter into the border
+SEG_THRESH = 138  # for white pieces, raise this to cut tighter into the border
 
 
 def photo_to_bmp(args):
@@ -35,7 +35,7 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=S
     print(f"> Segmenting photo `{input_photo_filename}` into `{output_path}`")
     bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename,
                                                                 threshold=threshold, max_width=width,
-                                                                crop_by=CROP_ALL_SIDES_BY if crop else 0)
+                                                                crop=CROP_TRBL if crop else 0)
     if output_path:
         _save(output_path, bw_pixels, width, height)
 

@@ -50,14 +50,14 @@ class Side(object):
     def length(self) -> float:
         return util.distance(self.p1, self.p2)
 
-    def error_when_fit_with(self, side, flip=True, render=False, debug_str=None) -> bool:
+    def error_when_fit_with(self, side, flip=True, render=False, skip_edges = True, debug_str=None) -> bool:
         """
         Returns None if no match, or a float representing the similarity of the two sides (1.0 = perfect) if they generally match
         """
         # if render and debug_str:
         #     print(debug_str)
 
-        if self.is_edge or side.is_edge:
+        if skip_edges and (self.is_edge or side.is_edge):
             # if render:
             #     print("\tNO MATCH: one is an edge!!!!!!!!!!")
             return 1000

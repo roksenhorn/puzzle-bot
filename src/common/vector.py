@@ -170,7 +170,7 @@ class Vector(object):
 
     def save(self, output_path) -> None:
         d = SCALAR / 2.0  # scale the SVG down by this denominator
-        full_svg_path = os.path.join(output_path, f"{self.id}_full.svg")
+        full_svg_path = os.path.join(output_path, f"{self.id}.svg")
         colors = ['cc0000', '999900', '00aa99', '3300bb']
         svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
         svg += f'<svg width="{3 * self.width / d}" height="{3 * self.height / d}" viewBox="-10 -10 {20 + self.width / d} {20 + self.height /d}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
@@ -573,26 +573,3 @@ class Vector(object):
             line = ''.join(line)
             print(f'{util.GRAY}> {util.WHITE}{line}{util.GRAY}<{util.WHITE} {i}')
         print(f' {util.GRAY} ' + '^ ' * self.width + f"{util.WHITE}")
-
-    def compare(self, piece) -> float:
-        """
-        Compare this piece to another piece, returning a score of how similar they are
-        0 = no error
-        higher = more error
-        """
-        min_cumulative_error = None
-        for start_i in range(4):
-            cumulative_error = 0
-            for p1_side_i in range(4):
-                p0_side_i = (p1_side_i + start_i) % 4
-                error = self.sides[p0_side_i].error_when_fit_with(piece[p1_side_i], flip=False, render=False)
-                if error is None:
-                    cumulative_error = None
-                    break
-                else:
-                    cumulative_error += error
-
-            if min_cumulative_error is None or (cumulative_error is not None and cumulative_error < min_cumulative_error):
-                min_cumulative_error = cumulative_error
-
-        return min_cumulative_error

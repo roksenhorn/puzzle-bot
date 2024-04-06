@@ -37,7 +37,7 @@ def load_bmp_as_binary_pixels(path):
     return binary_pixels, width, height
 
 
-def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
+def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
@@ -48,8 +48,10 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop_by=0):
             except Exception as e:
                 print(f"Error resizing {path}")
                 raise e
-            if crop_by:
-                img = img.crop((crop_by, crop_by, img.size[0] - crop_by, img.size[1] - crop_by))
+
+        if crop:
+            w, h = img.size
+            img = img.crop((crop[3], crop[0], w - crop[1], h - crop[2]))
 
         # Get image data as a 1D array of pixels
         width, height = img.size
@@ -576,7 +578,11 @@ def sublist_exists(lst, sub_lst):
 
     return sub_lst_str in lst_extended_str
 
-def find_islands(grid, callback=None, ignore_islands_along_border=False, island_value=1):
+
+import numpy as np
+from collections import deque
+
+def find_islands(grid, callback=None, ignore_islands_along_border=True, island_value=1):
     """
     Given a grid of 0s and 1s, finds all "islands" of 1s:
     00000000
@@ -592,34 +598,30 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False, island_
 
     Returns either a list of islands, or a list of Trues if a callback was provided
     """
-    visited1 = set()
-    visited2 = set()
+    visited = np.zeros_like(grid, dtype=bool)
     islands = []
-    for i in range(len(grid)):
-        for j in range(len(grid[i])):
-            if grid[i][j] == 1 and (i, j) not in visited1 and (i, j) not in visited2:
-                island = set()
-                queue = [(i, j)]
-                touched_border = False
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+    w, h = grid.shape
 
-                # to prevent memory from getting too big and lookups from taking too long,
-                # we maintain two visited sets, we check if we've visited a
-                # location by checking either, and drain them offset
-                if len(islands) % 160 == 0:
-                    visited1 = set()
-                if len(islands) % 160 == 80:
-                    visited2 = set()
+    for y in range(h):
+        for x in range(w):
+            if grid[x, y] == 1 and not visited[x, y]:
+                island = []
+                queue = deque([(x, y)])
+                touched_border = x == 0 or y == 0 or x == w - 1 or y == h - 1
+
                 while queue:
-                    x, y = queue.pop(0)
-                    if (x, y) not in visited1 and (x, y) not in visited2:
-                        visited1.add((x, y))
-                        visited2.add((x, y))
-                        island.add((y, x))
-                        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                            if 0 <= x + dx < len(grid) and 0 <= y + dy < len(grid[0]) and grid[x + dx][y + dy] == island_value:
-                                queue.append((x + dx, y + dy))
-                        if x == 0 or y == 0 or x == len(grid) - 1 or y == len(grid[0]) - 1:
-                            touched_border = True
+                    cx, cy = queue.popleft()
+                    if not visited[cx, cy]:
+                        visited[cx, cy] = True
+                        island.append((cy, cx))
+
+                        for dx, dy in directions:
+                            nx, ny = cx + dx, cy + dy
+                            if 0 <= nx < w and 0 <= ny < h and grid[nx, ny] == 1:
+                                queue.append((nx, ny))
+                                if nx == 0 or ny == 0 or nx == w - 1 or ny == h - 1:
+                                    touched_border = True
 
                 if ignore_islands_along_border and touched_border:
                     continue
@@ -630,6 +632,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=False, island_
                         islands.append(True)
                 else:
                     islands.append(island)
+
     return islands
 
 
@@ -750,17 +753,13 @@ def normalized_area_between_corners(vertices):
 
 def remove_stragglers(pixels, width, height) -> bool:
     """
-    Given an array of binary pixels, removes any pixels that are only connected to one other pixel
+    Given an array of binary pixels, removes any pixels that are "dangling" and only connected to one or two other pixels
     Returns True if any were removed
     """
     removed = False
 
     for y in range(1, height - 1):
         for x in range(1, width - 1):
-            v = pixels[y][x]
-            if v != 1:
-                continue
-
             # All 8 neighbors
             above_left = pixels[y - 1][x - 1]
             above = pixels[y - 1][x]
@@ -780,17 +779,17 @@ def remove_stragglers(pixels, width, height) -> bool:
                 below_left,
                 left,
             ]
-            borders = [True for n in neighbors if n == 1]
-            if len(borders) <= 1:
+            neighbor_ones = [True for n in neighbors if n == 1]
+            v = pixels[y][x]
+
+            if v == 1 and len(neighbor_ones) <= 2:
                 # straggler only connected by one
                 pixels[y][x] = 0
                 removed = True
 
-            # if there are only 2 neighbors, and they are not adjacent (e.g. no [1, 1] subset in the list), then these
-            # are one-pixel-wide bridges that should be removed
-            if len(borders) == 2 and not sublist_exists(borders, [1, 1]):
-                pixels[y][x] = 0
-                removed = True
+            # also find "cracks" that are a hairline wide of 0s
+            if v == 0 and len(neighbor_ones) >= 6:
+                pixels[y][x] = 1
 
     if removed:
         return remove_stragglers(pixels, width, height)

@@ -15,11 +15,11 @@ PHOTO_BMP_DIR = '1_photo_bmps'
 # Step 2 takes in photo BMPs and outputs cleaned up individual pieces as bitmaps
 SEGMENT_DIR = '2_segmented'
 
-# Step 3 goes through all the BMP pieces and deletes duplicates
-DEDUPED_DIR = '3_deduped'
-
 # Step 4 takes in piece BMPs and outputs SVGs
-VECTOR_DIR = '4_vector'
+VECTOR_DIR = '3_vector'
+
+# Step 4 goes through all the vector pieces and deletes duplicates
+DEDUPED_DIR = '4_deduped'
 
 # Step 5 takes in SVGs and outputs a graph of connectivity
 CONNECTIVITY_DIR = '5_connectivity'
@@ -31,7 +31,7 @@ SOLUTION_DIR = '6_solution'
 def solve(path, serialize, id, start_at_step, stop_before_step):
     start_time = time.time()
 
-    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, DEDUPED_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
+    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
         # wipe any directories we'll act on, except 0 which is the input
@@ -46,13 +46,13 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
         extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        deduplicate(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, DEDUPED_DIR))
+        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
     if start_at_step <= 3 and stop_before_step > 3:
-        vectorize(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+        deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
 
     if start_at_step <= 4 and stop_before_step > 4:
-        find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
+        find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
 
     if start_at_step <= 5 and stop_before_step > 5 and not id:
         build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
@@ -66,6 +66,8 @@ def bmp_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
+    print(f"\n{util.RED}### 0 - Segmenting photos into binary images ###{util.WHITE}\n")
+
     if id:
         fs = [f'{id}.jpeg']
     else:
@@ -86,44 +88,38 @@ def extract_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
-    print(f"\n{util.RED}### Extracting pieces from photo bitmaps ###{util.WHITE}\n")
+    print(f"\n{util.RED}### 1 - Extracting pieces from photo bitmaps ###{util.WHITE}\n")
 
     if id:
         fs = [f'{id}.bmp']
     else:
         fs = [f for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
-        id = 1
 
     args = []
     for f in fs:
         input_img_path = os.path.join(input_path, f)
         output_img_path = os.path.join(output_path)
-        unique_id = id
-        args.append([input_img_path, output_img_path, unique_id])
-        id += 1
+        args.append([input_img_path, output_img_path])
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(extract.extract_pieces, args)
-
-
-def deduplicate(input_path, output_path):
-    # deduplicate the pieces - often times the same piece was successfully extracted from multiple photos
-    print(f"\n{util.RED}### Deduplicated extracted pieces ###{util.WHITE}\n")
-    dedupe.deduplicate(input_path, output_path)
 
 
 def vectorize(input_path, output_path, id, serialize):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
-    print(f"\n{util.RED}### Vectorizing ###{util.WHITE}\n")
+    print(f"\n{util.RED}### 2 - Vectorizing ###{util.WHITE}\n")
 
     start_time = time.time()
     i = id if id is not None else 1
 
     args = []
-    while os.path.exists(os.path.join(input_path, f'{i}.bmp')):
-        path = os.path.join(input_path, f'{i}.bmp')
+
+    for f in os.listdir(input_path):
+        if not f.endswith('.bmp'):
+            continue
+        path = os.path.join(input_path, f)
         render = (i == id)
         args.append([path, i, output_path, render])
 
@@ -142,11 +138,22 @@ def vectorize(input_path, output_path, id, serialize):
     print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
 
 
+def deduplicate(input_path, output_path):
+    """
+    Often times the same piece was successfully extracted from multiple photos
+    We do this on vectorized pieces to ignore noise in BMPs
+    """
+    print(f"\n{util.RED}### 3 - Deduplicating vector pieces ###{util.WHITE}\n")
+    count = dedupe.deduplicate(input_path, output_path)
+    if count != 1000:
+        raise Exception(f"Expected 1000 pieces, but found {count}")
+
+
 def find_connectivity(input_path, output_path, id, serialize):
     """
     Opens each piece data and finds how each piece could connect to others
     """
-    print(f"\n{util.RED}### Building connectivity ###{util.WHITE}\n")
+    print(f"\n{util.RED}### 4 - Building connectivity ###{util.WHITE}\n")
     start_time = time.time()
     connect.build(input_path, output_path, id, serialize)
     duration = time.time() - start_time
@@ -157,7 +164,7 @@ def build_board(input_path, output_path):
     """
     Searches connectivity to find the solution
     """
-    print(f"\n{util.RED}### Build board ###{util.WHITE}\n")
+    print(f"\n{util.RED}### 5 - Build board ###{util.WHITE}\n")
     start_time = time.time()
     board.build(input_path, output_path)
     duration = time.time() - start_time
@@ -192,7 +199,7 @@ def rename(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
-    parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=int)
+    parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=str)
     parser.add_argument('--start-at-step', default=0, required=False, help='Start processing at this step', type=int)
     parser.add_argument('--stop-before-step', default=10, required=False, help='Stop processing at this step', type=int)
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
@@ -206,7 +213,7 @@ def main():
 
 
 if __name__ == '__main__':
-    PROFILE = False
+    PROFILE = True
     if PROFILE:
         cProfile.run('main()', 'profile_results.prof')
     else:
