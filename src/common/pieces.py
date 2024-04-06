@@ -8,17 +8,12 @@ class Piece(object):
     @staticmethod
     def load_all(directory, resample=False):
         pieces = {}
-        i = 1
-        done = False
-        while not done:
-            path = os.path.join(directory, f"side_{i}_0.json")
-            if os.path.exists(path):
-                piece = Piece.load(directory, id=i, resample=resample)
-                pieces[piece.id] = piece
-            else:
-                done = True
-                break
-            i += 1
+        for f in os.listdir(directory):
+            if not f.startswith("side_"):
+                continue
+            id = int(f.split("_")[1])
+            piece = Piece.load(directory, id=id, resample=resample)
+            pieces[piece.id] = piece
         return pieces
 
     @classmethod

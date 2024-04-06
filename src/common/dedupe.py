@@ -1,13 +1,14 @@
 import os
-from PIL import Image
 import json
 import numpy as np
+import math
 
 from common import util, sides
 import shutil
 
 
-DUPLICATE_THRESHOLD = 1.0
+DUPLICATE_THRESHOLD = 1.3
+SIDE_MISALIGNMENT_RAD = 12.0 * math.pi / 180
 
 
 def deduplicate(input_path, output_path):
@@ -26,7 +27,7 @@ def deduplicate(input_path, output_path):
         for j in range(4):
             with open(os.path.join(input_path, f'side_{i}_{j}.json')) as f:
                 data = json.load(f)
-                side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True)
+                side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True, rotate=False)
                 piece.append(side)
         pieces[i] = piece
         i += 1
@@ -35,30 +36,40 @@ def deduplicate(input_path, output_path):
     dupes = set()
 
     for i, sides0 in pieces.items():
+        # if this piece is duplicating someone else, skip it
         if i in dupes:
             continue
 
-        found_dupe = False
+        dupe_side_lens = {}
+        dupe_side_lens[i] = sum([s.length for s in sides0])
         for j, sides1 in pieces.items():
             if i == j:
                 continue
 
             score = _compare(sides0, sides1)
             if score < DUPLICATE_THRESHOLD:
-                print(f"[{i}]\t Marking piece {j} as duplicate \t Similarity: {score}")
-                dupes.add(j)
-                found_dupe = True
+                print(f"[{i}]\t is duplicated by {j} \t Similarity: {score}")
+                dupe_side_lens[j] = sum([s.length for s in sides1])
+            elif score < DUPLICATE_THRESHOLD * 4.75:
+                print(f"\t\t\t[{i}]\t is similar to {j} \t Similarity: {score}")
 
-        if not found_dupe:
+        if len(dupe_side_lens) == 1:
+            # if this piece was truly unique, keep it
             uniques.add(i)
+        else:
+            # if this piece has duplciates, of all the duplicates, find the one with the cleanest vectorization
+            sorted_side_lens = sorted(dupe_side_lens.items(), key=lambda x: (x[1], x[0]))
+            best_dupe = sorted_side_lens[0][0]
+            uniques.add(best_dupe)
+            print(f"\t Keeping {best_dupe} with len {sorted_side_lens[0][1]}")
+            for j in sorted_side_lens[1:]:
+                dupes.add(j[0])
+                print(f"\t Removing {j[0]} with len {j[1]}")
 
     print(f"Started with {len(pieces)}; found {len(dupes)} duplicate pieces; resulting in {len(uniques)} unique pieces.")
 
-    # finally, save off all the uniques
+    # finally, copy all the uniques to the output directory
     for id in uniques:
-        # copy the file to the output directory
-        svg = f'{id + 1}.svg'
-        shutil.copyfile(os.path.join(input_path, svg), os.path.join(output_path, svg))
         for i in range(4):
             side_i = f'side_{id}_{i}.json'
             shutil.copyfile(os.path.join(input_path, side_i), os.path.join(output_path, side_i))
@@ -71,20 +82,38 @@ def _compare(sides0, sides1):
     Compare this piece to another piece, returning a score of how similar they are
     0 = no error
     higher = more error
+    Note: we cannot assume that sides0[0] is the same as sides1[0] - they might be in different indices
     """
-    min_cumulative_error = None
-    for start_i in range(4):
-        cumulative_error = 0
-        for p1_side_i in range(4):
-            p0_side_i = (p1_side_i + start_i) % 4
-            error = sides0[p0_side_i].error_when_fit_with(sides1[p1_side_i], flip=False, skip_edges=False, render=False)
-            if error is None:
-                cumulative_error = None
-                break
-            else:
-                cumulative_error += error
 
-        if min_cumulative_error is None or (cumulative_error is not None and cumulative_error < min_cumulative_error):
+    side00, side01, side02, side03 = sides0
+    permutations = [
+        [side00, side01, side02, side03],
+        [side01, side02, side03, side00],
+        [side02, side03, side00, side01],
+        [side03, side00, side01, side02]
+    ]
+
+    min_cumulative_error = 1000
+    for sides0 in permutations:
+        sides_aligned = True
+
+        # first check to see if the pieces are in approximately the same orientation
+        # we expect no rotation between duplicates
+        for i in range(4):
+            angle_diff = util.compare_angles(sides0[i].angle, sides1[i].angle)
+            if angle_diff > SIDE_MISALIGNMENT_RAD:
+                sides_aligned = False
+                break
+
+        if not sides_aligned:
+            continue
+
+        # if the sides are in approximately the same orientation, see how close to perfect matches they are
+        cumulative_error = 0
+        for i in range(4):
+            cumulative_error += sides0[i].error_when_fit_with(sides1[i], flip=False, skip_edges=False, render=False)
+
+        if cumulative_error < min_cumulative_error:
             min_cumulative_error = cumulative_error
 
     return min_cumulative_error

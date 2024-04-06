@@ -135,10 +135,10 @@ class Vector(object):
     def from_file(filename, id) -> 'Vector':
         # Open image file
         binary_pixels, width, height = util.load_bmp_as_binary_pixels(filename)
-        v = Vector(pixels=binary_pixels, width=width, height=height, id=id)
+        v = Vector(pixels=binary_pixels, width=width, height=height, id=id, filename=filename)
         return v
 
-    def __init__(self, pixels, width, height, id) -> None:
+    def __init__(self, pixels, width, height, id, filename=None) -> None:
         self.pixels = pixels
         self.width = width
         self.height = height
@@ -146,6 +146,7 @@ class Vector(object):
         self.id = id
         self.sides = []
         self.corners = []
+        self.filename = filename
 
     def process(self, output_path=None, render=False):
         print(f"> Vectorizing {self.id}")
@@ -169,8 +170,8 @@ class Vector(object):
             return self
 
     def save(self, output_path) -> None:
+        # We generate an SVG of the piece for debugging
         d = SCALAR / 2.0  # scale the SVG down by this denominator
-        full_svg_path = os.path.join(output_path, f"{self.id}.svg")
         colors = ['cc0000', '999900', '00aa99', '3300bb']
         svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
         svg += f'<svg width="{3 * self.width / d}" height="{3 * self.height / d}" viewBox="-10 -10 {20 + self.width / d} {20 + self.height /d}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
@@ -187,9 +188,12 @@ class Vector(object):
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
         svg += '</svg>'
-        with open(full_svg_path, 'w') as f:
+        filename = self.filename.split('/')[-1].split('.')[0]
+        svg_path = os.path.join(output_path, f"{self.id}_{filename}.svg")
+        with open(svg_path, 'w') as f:
             f.write(svg)
 
+        # Then we save off the side data for future processing steps
         for i, side in enumerate(self.sides):
             side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
             # convert vertices from np types to native python types

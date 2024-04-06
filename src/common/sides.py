@@ -16,23 +16,27 @@ SIDE_RESAMPLE_VERTEX_COUNT = 26
 
 
 class Side(object):
-    def __init__(self, piece_id, side_id, vertices, piece_center, is_edge, resample=False) -> None:
+    def __init__(self, piece_id, side_id, vertices, piece_center, is_edge, resample=False, rotate=True) -> None:
         self.piece_id = piece_id
         self.side_id = side_id
         self.piece_center = piece_center
         self.is_edge = is_edge
-
         self.vertices = vertices
         self.p1 = vertices[0]
         self.p2 = vertices[-1]
 
         if resample:
             vertices, self.v_length = util.resample_polyline(vertices, n=SIDE_RESAMPLE_VERTEX_COUNT)
-            angle = self.angle
-            self.vertices = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=0)  # aligned to be horizontal
-            self.vertices_flipped = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=math.pi)[::-1] # aligned to be horizontal but rotated and mirrored to be the negative space of the side
+            if rotate:
+                angle = self.angle
+                self.vertices = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=0)  # aligned to be horizontal
+                self.vertices_flipped = Side.rotated(vertices=vertices, from_angle=angle, desired_angle=math.pi)[::-1] # aligned to be horizontal but rotated and mirrored to be the negative space of the side
+            else:
+                self.vertices = np.array(vertices)
             self.p1 = self.vertices[0]
             self.p2 = self.vertices[-1]
+        else:
+            self.v_length = util.polyline_length(vertices)
 
     def __repr__(self) -> str:
         return f"Side({self.p1}->{self.p2} @ {int(self.angle * 180/math.pi)} deg, len={self.length}, n_vertices={len((self.vertices))}, is_edge={self.is_edge})"
