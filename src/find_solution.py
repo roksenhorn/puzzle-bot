@@ -4,6 +4,7 @@ import os
 import time
 import multiprocessing
 import re
+from PIL import Image
 
 from common import bmp, board, connect, dedupe, extract, util, vector
 
@@ -33,6 +34,10 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
 
     for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
+
+        # remove .DS_Store files
+        if os.path.exists(os.path.join(path, d, '.DS_Store')):
+            os.remove(os.path.join(path, d, '.DS_Store'))
 
         # wipe any directories we'll act on, except 0 which is the input
         if i != 0 and i > start_at_step and i <= stop_before_step:

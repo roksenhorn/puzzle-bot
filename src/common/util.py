@@ -1,5 +1,5 @@
 import math
-from PIL import Image
+from PIL import Image, ExifTags
 from typing import List, Tuple
 from shapely.geometry import Polygon, Point, LineString
 import numpy as np
@@ -37,11 +37,27 @@ def load_bmp_as_binary_pixels(path):
     return binary_pixels, width, height
 
 
+def get_photo_orientation(img):
+    exif = img._getexif()
+    if exif:
+        for tag, value in exif.items():
+            if tag in ExifTags.TAGS:
+                if ExifTags.TAGS[tag] == 'Orientation':
+                    return value
+    return 1
+
 def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
+        if get_photo_orientation(img) != 1:
+            raise Exception(f"Image {path} is not oriented correctly")
+
+        w, h = img.size
+        if w < h:
+            raise Exception(f"Image {path} is portrait, not landscape")
+
         if max_width is not None and img.size[0] > max_width:
             try:
                 img.thumbnail((max_width, img.size[1]), resample=Image.NEAREST)
@@ -605,7 +621,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=True, island_v
 
     for y in range(h):
         for x in range(w):
-            if grid[x, y] == 1 and not visited[x, y]:
+            if grid[x, y] == island_value and not visited[x, y]:
                 island = []
                 queue = deque([(x, y)])
                 touched_border = x == 0 or y == 0 or x == w - 1 or y == h - 1
@@ -618,7 +634,7 @@ def find_islands(grid, callback=None, ignore_islands_along_border=True, island_v
 
                         for dx, dy in directions:
                             nx, ny = cx + dx, cy + dy
-                            if 0 <= nx < w and 0 <= ny < h and grid[nx, ny] == 1:
+                            if 0 <= nx < w and 0 <= ny < h and grid[nx, ny] == island_value:
                                 queue.append((nx, ny))
                                 if nx == 0 or ny == 0 or nx == w - 1 or ny == h - 1:
                                     touched_border = True
