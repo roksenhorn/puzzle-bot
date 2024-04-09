@@ -46,6 +46,7 @@ def get_photo_orientation(img):
                     return value
     return 1
 
+
 def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
@@ -69,30 +70,17 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
             w, h = img.size
             img = img.crop((crop[3], crop[0], w - crop[1], h - crop[2]))
 
-        # Get image data as a 1D array of pixels
-        width, height = img.size
-        pixels = list(img.getdata())
+        return threshold_pixels(img, threshold)
 
-    # Convert pixels to 0 or 1 2D array
-    # turns piece pixels into 1s, background into 0s
-    # turn saturated parts to background color
-    # e.g. we are using hot pink duck tape to delineate the border of the table
-    # we also see lens blur comes across as a saturated blue
-    bg_color = 0
-    piece_color = 1
-    binary_pixels = np.empty(height, dtype=object)
-    for i, rgb in enumerate(pixels):
-        brightness = sum(rgb) // 3
-        binary_pixel = bg_color if brightness <= threshold else piece_color
-        x = i % width
-        y = i // width
-        if x == 0:
-            row = np.empty(width, dtype=np.int8)
-            binary_pixels[y] = row
 
-        binary_pixels[y][x] = binary_pixel
+def threshold_pixels(img, threshold):
+    # Convert image to grayscale numpy array
+    grayscale = img.convert('L')
+    data = np.array(grayscale)
 
-    return binary_pixels, width, height
+    # Apply threshold to get binary representation
+    binary_data = np.where(data <= threshold, 0, 1).astype(np.int8)
+    return binary_data, binary_data.shape[1], binary_data.shape[0]
 
 
 def remove_small_islands(pixels, min_size, ignore_islands_along_border=False, island_value=1):

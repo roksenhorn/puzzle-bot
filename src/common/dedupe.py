@@ -7,7 +7,7 @@ from common import util, sides
 import shutil
 
 
-DUPLICATE_THRESHOLD = 1.3
+DUPLICATE_THRESHOLD = 1.5
 SIDE_MISALIGNMENT_RAD = 12.0 * math.pi / 180
 
 
@@ -50,7 +50,7 @@ def deduplicate(input_path, output_path):
             if score < DUPLICATE_THRESHOLD:
                 print(f"[{i}]\t is duplicated by {j} \t Similarity: {score}")
                 dupe_side_lens[j] = sum([s.length for s in sides1])
-            elif score < DUPLICATE_THRESHOLD * 4.75:
+            elif score < DUPLICATE_THRESHOLD * 2.0:
                 print(f"\t\t\t[{i}]\t is similar to {j} \t Similarity: {score}")
 
         if len(dupe_side_lens) == 1:
