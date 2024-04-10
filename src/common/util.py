@@ -3,6 +3,8 @@ from PIL import Image, ExifTags
 from typing import List, Tuple
 from shapely.geometry import Polygon, Point, LineString
 import numpy as np
+import numpy as np
+from collections import deque
 
 
 YELLOW = '\033[33m'
@@ -17,6 +19,8 @@ BLACK_ON_WHITE = '\033[30;47m'
 BLACK_ON_BLUE = '\033[30;44m'
 BLACK_ON_RED = '\033[30;41m'
 BLACK_ON_GREEN = '\033[30;42m'
+
+EXPECTED_PHOTO_ORIENTATION = 6
 
 
 def load_bmp_as_binary_pixels(path):
@@ -52,8 +56,8 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
-        if get_photo_orientation(img) != 1:
-            raise Exception(f"Image {path} is not oriented correctly")
+        if (orientation := get_photo_orientation(img)) != EXPECTED_PHOTO_ORIENTATION:
+            raise Exception(f"Image {path} is not oriented correctly: {orientation}")
 
         w, h = img.size
         if w < h:
@@ -81,26 +85,6 @@ def threshold_pixels(img, threshold):
     # Apply threshold to get binary representation
     binary_data = np.where(data <= threshold, 0, 1).astype(np.int8)
     return binary_data, binary_data.shape[1], binary_data.shape[0]
-
-
-def remove_small_islands(pixels, min_size, ignore_islands_along_border=False, island_value=1):
-    """
-    Find and remove all islands of pixels that are smaller than some set number of pixels
-    """
-    # find all the islands
-    lines = [[e for e in l] for l in pixels]
-    islands = find_islands(lines, ignore_islands_along_border=ignore_islands_along_border, island_value=island_value)
-
-    # sort islands (which is a list of list) by len of each island
-    islands.sort(key=lambda i: len(i), reverse=True)
-
-    # remove all other islands
-    removed_count = 0
-    for island in islands:
-        if len(island) < min_size:
-            removed_count += 1
-            for x, y in island:
-                pixels[y][x] = 0 if island_value == 1 else 1
 
 
 def ramer_douglas_peucker(points, epsilon):
@@ -582,9 +566,6 @@ def sublist_exists(lst, sub_lst):
 
     return sub_lst_str in lst_extended_str
 
-
-import numpy as np
-from collections import deque
 
 def find_islands(grid, callback=None, ignore_islands_along_border=True, island_value=1):
     """

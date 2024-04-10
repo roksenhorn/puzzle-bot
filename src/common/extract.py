@@ -4,35 +4,7 @@ import PIL
 from common import util
 
 
-PIL.Image.MAX_IMAGE_PIXELS = 912340000
-
 MIN_PIECE_AREA = 100 * 100
-
-def thumbnail(args):
-    input_path, output_path = args
-    img = PIL.Image.open(input_path)
-    w, h = img.size[0] // 10, img.size[1] // 10
-    img.thumbnail((w, h), PIL.Image.NEAREST)
-    img = img.convert('1')
-    img = img.crop((0, 0, 66, 66))
-    img.save(output_path)
-    print(f"Scaled down {input_path.split('/')[-1]} to {w}x{h}")
-
-
-def fill_islands(args):
-    input_path, output_path = args
-    print(f"fill_islands({input_path}, {output_path})")
-    pixels, width, height = util.load_bmp_as_binary_pixels(input_path)
-    islands = util.find_islands(pixels, ignore_islands_along_border=True, island_value=0)
-
-    print(f"Found {len(islands)} islands in {input_path.split('/')[-1]}")
-    for i, island in enumerate(islands):
-        for (x, y) in island:
-            pixels[y][x] = 1
-
-    img = PIL.Image.new('1', (width, height))
-    img.putdata([pixel for row in pixels for pixel in row])
-    img.save(output_path)
 
 
 def extract_pieces(args):
