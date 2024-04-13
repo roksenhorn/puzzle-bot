@@ -30,10 +30,14 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
 
     # 3 - vectorize the pieces from each of the extracted bitmaps
     piece_id = starting_piece_id
+    args = []
     for f in extracted_paths:
         vector_path = os.path.join(working_dir, VECTOR_DIR)
-        vector.load_and_vectorize(args=(f, piece_id, vector_path, False))
+        args.append((f, piece_id, vector_path, False))
         piece_id += 1
+
+    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
+        pool.map(vector.load_and_vectorize, args)
 
     return piece_id
 
