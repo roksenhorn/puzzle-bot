@@ -4,12 +4,12 @@ import os
 import time
 import multiprocessing
 import re
-from PIL import Image
 
 from common import bmp, board, connect, dedupe, extract, util, vector
+from common.config import *
 
 
-# Step 1 takes in photos of pieces on the bed and output BMPs that contain multiple pieces
+# Step 1 takes in photos of pieces on the bed and outputs binary BMPs of those photos
 PHOTOS_DIR = '0_photos'
 PHOTO_BMP_DIR = '1_photo_bmps'
 
@@ -29,9 +29,7 @@ CONNECTIVITY_DIR = '5_connectivity'
 SOLUTION_DIR = '6_solution'
 
 
-def solve(path, serialize, id, start_at_step, stop_before_step):
-    start_time = time.time()
-
+def prepare_new_run(path, start_at_step, stop_before_step):
     for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
@@ -43,6 +41,10 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
         if i != 0 and i > start_at_step and i <= stop_before_step:
             for f in os.listdir(os.path.join(path, d)):
                 os.remove(os.path.join(path, d, f))
+
+
+def batch_process_photos(path, serialize, id, start_at_step, stop_before_step):
+    start_time = time.time()
 
     if start_at_step <= 0 and stop_before_step > 0:
         bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
@@ -56,15 +58,18 @@ def solve(path, serialize, id, start_at_step, stop_before_step):
     if start_at_step <= 3 and stop_before_step > 3:
         deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
 
-    if start_at_step <= 4 and stop_before_step > 4:
-        find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR), id=id, serialize=serialize)
+    duration = time.time() - start_time
+    print(f"\n\n{util.GREEN}### Batch processed photos in {round(duration, 2)} sec ###{util.WHITE}\n")
 
-    if start_at_step <= 5 and stop_before_step > 5 and not id:
-        build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
-    if stop_before_step is None:
-        duration = time.time() - start_time
-        print(f"\n\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
+def solve(path):
+    start_time = time.time()
+
+    find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+    build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
+
+    duration = time.time() - start_time
+    print(f"\n\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
 
 
 def bmp_all(input_path, output_path, id):
@@ -150,17 +155,17 @@ def deduplicate(input_path, output_path):
     """
     print(f"\n{util.RED}### 3 - Deduplicating vector pieces ###{util.WHITE}\n")
     count = dedupe.deduplicate(input_path, output_path)
-    if count != 1000:
-        raise Exception(f"Expected 1000 pieces, but found {count}")
+    if count != PUZZLE_NUM_PIECES:
+        raise Exception(f"Expected {PUZZLE_NUM_PIECES} pieces, but found {count}")
 
 
-def find_connectivity(input_path, output_path, id, serialize):
+def find_connectivity(input_path, output_path):
     """
     Opens each piece data and finds how each piece could connect to others
     """
     print(f"\n{util.RED}### 4 - Building connectivity ###{util.WHITE}\n")
     start_time = time.time()
-    connect.build(input_path, output_path, id, serialize)
+    connect.build(input_path, output_path)
     duration = time.time() - start_time
     print(f"Building the graph took {round(duration, 2)} seconds")
 
@@ -208,17 +213,16 @@ def main():
     parser.add_argument('--start-at-step', default=0, required=False, help='Start processing at this step', type=int)
     parser.add_argument('--stop-before-step', default=10, required=False, help='Stop processing at this step', type=int)
     parser.add_argument('--serialize', default=False, action="store_true", help='Single-thread processing')
-    parser.add_argument('--rename', default=False, action="store_true", help='Renames the input files to 1.jpeg, 2.jpeg, ...')
     args = parser.parse_args()
 
-    if args.rename:
-        rename(path=args.path)
-
-    solve(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+    prepare_new_run(path=args.path, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+    batch_process_photos(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+    if args.stop_before_step is not None and args.stop_before_step > 3:
+        solve(path=args.path)
 
 
 if __name__ == '__main__':
-    PROFILE = True
+    PROFILE = False
     if PROFILE:
         cProfile.run('main()', 'profile_results.prof')
     else:

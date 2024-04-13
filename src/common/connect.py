@@ -9,6 +9,8 @@ from common import pieces, sides
 # Building the graph took 440.38 seconds
 
 
+# Useful for debugging - punch in the piece ids and side ids that should match
+# and we'll print extra debug info for these and assert they match
 SOLUTION = [
     # [(1, 0), (4, 2)],
     # [(1, 1), (2, 3)],
@@ -18,21 +20,14 @@ SOLUTION = [
 ]
 
 
-def build(input_path, output_path, id=None, serialize=False):
+def build(input_path, output_path):
     print("> Loading piece data...")
     ps = pieces.Piece.load_all(input_path, resample=True)
     print("\t ...Loaded")
 
-    if not serialize and id is None:
-        with multiprocessing.Pool(processes=8) as pool:
-            results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
-            out = [r.get() for r in results]
-    else:
-        out = []
-        for piece_id in ps.keys():
-            if id is not None and piece_id != id:
-                continue
-            out.append(_find_potential_matches_for_piece(ps, piece_id, debug=(id is not None)))
+    with multiprocessing.Pool(processes=8) as pool:
+        results = [pool.apply_async(_find_potential_matches_for_piece, (ps, piece_id)) for piece_id in ps.keys()]
+        out = [r.get() for r in results]
 
     ps = { piece_id: piece for (piece_id, piece) in out }
     _save(ps, output_path)

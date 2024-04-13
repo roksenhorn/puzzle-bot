@@ -3,6 +3,7 @@ import yaml
 import math
 import heapq
 
+from common.config import *
 
 """
 (0, 0) ... (w, 0)
@@ -34,10 +35,6 @@ class Orientation(object):
     ZERO_POINTS_RIGHT = 1
     ZERO_POINTS_DOWN = 2
     ZERO_POINTS_LEFT = 3
-
-# dimensions for the puzzle you're solving
-WIDTH = 40
-HEIGHT = 25
 
 
 class Board(object):
@@ -177,7 +174,7 @@ def build(input_path, output_path):
 
     corners = []
     edges = []
-    edge_length = 2 * (WIDTH + HEIGHT) - 4
+    edge_length = 2 * (PUZZLE_WIDTH + PUZZLE_HEIGHT) - 4
     for piece_id, neighbors in ps.items():
         edge_count = sum([1 for n in neighbors if len(n) == 0])
         if edge_count > 0:
@@ -210,7 +207,7 @@ def build_from_corner(ps, start_piece_id):
     print(f"\n===============================\nBuilding from corner {start_piece_id}...")
     start_piece_fits = ps[start_piece_id]
     start_orientation = _orient_start_corner_to_top_left(start_piece_fits)
-    board = Board(width=WIDTH, height=HEIGHT)
+    board = Board(width=PUZZLE_WIDTH, height=PUZZLE_HEIGHT)
 
     x, y = (0, 0)
     board.place(start_piece_id, start_piece_fits, x, y, start_orientation)
@@ -233,8 +230,8 @@ def build_from_corner(ps, start_piece_id):
             print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
 
-        if board.placed_count == WIDTH * HEIGHT:
-            print(f"Placed {WIDTH * HEIGHT} pieces in {iteration} iterations")
+        if board.placed_count == PUZZLE_WIDTH * PUZZLE_HEIGHT:
+            print(f"Placed {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces in {iteration} iterations")
             break
         elif board.placed_count > longest:
             longest = board.placed_count
@@ -265,7 +262,7 @@ def build_from_corner(ps, start_piece_id):
                 data = [next_board, neighbor_piece_id, neighbor_orientation, next_x, next_y, next_direction]
                 heapq.heappush(priority_q, (error, data))
 
-    if board.placed_count == WIDTH * HEIGHT:
+    if board.placed_count == PUZZLE_WIDTH * PUZZLE_HEIGHT:
         print(f"Found solution after {iteration} iterations!")
         print(board)
     else:
