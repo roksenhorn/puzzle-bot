@@ -7,6 +7,7 @@ import argparse
 import os
 
 import process, solve
+from common import util
 from common.config import *
 
 
@@ -15,13 +16,14 @@ def main():
     parser.add_argument('--input-path', help='Path to a directory of JPEGs')
     parser.add_argument('--working-dir', help='Where to process into')
     args = parser.parse_args()
-    _prepare_new_run(working_dir=args.working_dir)
+    _prepare_new_run(args.working_dir)
 
+    piece_id = 1
     for f in os.listdir(args.input_path):
         if f.endswith('.jpg') or f.endswith('.jpeg'):
-            print(f"Processing {f}")
+            print(f"{util.YELLOW}### Processing {f} ###{util.WHITE}")
             robot_state = {}  # TODO
-            process.process_photo(photo_path=os.path.join(args.input_path, f), working_dir=args.working_dir, robot_state=robot_state)
+            piece_id = process.process_photo(photo_path=os.path.join(args.input_path, f), working_dir=args.working_dir, starting_piece_id=piece_id, robot_state=robot_state)
 
     print("Solving")
     solve.solve(path=args.working_dir)

@@ -14,16 +14,26 @@ def extract_pieces(args):
     input_path, output_path = args
     pixels, _, _ = util.load_bmp_as_binary_pixels(input_path)
 
-    def found_island(island, i):
+    islands = util.find_islands(pixels, ignore_islands_along_border=True)
+    output_paths = []
+
+    piece_id = 1
+    for island in islands:
         unique_id = input_path.split('/')[-1].split('.')[0]
-        return _clean_and_save_piece(unique_id, i + 1, island, output_path)
+        piece_output_path = os.path.join(output_path, f'{unique_id}_{piece_id}.bmp')
+        if _clean_and_save_piece(island, piece_output_path):
+            output_paths.append(piece_output_path)
+            piece_id += 1
 
-    islands = util.find_islands(pixels, callback=found_island, ignore_islands_along_border=True)
-    print(f"Extracted {len(islands)} pieces from {input_path.split('/')[-1]}")
-    return len(islands)
+    print(f"> Extracted {len(output_paths)} pieces from {input_path.split('/')[-1]}")
+    return output_paths
 
 
-def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
+def _clean_and_save_piece(piece_coordinates, output_path):
+    """
+    Returns whether or not the piece was considered valid and was saved
+    """
+
     # reject noise in the image that is clearly too small to be a piece
     if len(piece_coordinates) < MIN_PIECE_AREA:
         return False
@@ -60,5 +70,5 @@ def _clean_and_save_piece(unique_id, piece_id, piece_coordinates, output_path):
 
     img = PIL.Image.new('1', (width, height))
     img.putdata([pixel for row in pixels for pixel in row])
-    img.save(os.path.join(output_path, f'{unique_id}_{piece_id}.bmp'))
+    img.save(output_path)
     return True

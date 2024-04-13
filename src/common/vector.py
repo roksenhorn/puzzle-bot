@@ -149,7 +149,7 @@ class Vector(object):
         self.filename = filename
 
     def process(self, output_path=None, render=False):
-        print(f"> Vectorizing {self.id}")
+        print(f"> Vectorizing piece {self.id}")
         self.find_border_raster()
         self.vectorize()
 
