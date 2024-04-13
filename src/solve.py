@@ -10,14 +10,13 @@ from common.config import *
 
 
 def solve(path):
-    start_time = time.time()
-
+    """
+    Given a path to processed piece data, finds a solution
+    TODO: return a path to the solution?
+    """
     _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
     _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
     _build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
-
-    duration = time.time() - start_time
-    print(f"\n\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
 
 
 def _deduplicate(input_path, output_path):

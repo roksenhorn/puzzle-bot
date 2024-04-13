@@ -2,34 +2,54 @@
 Processes photographs of pieces into digitzed piece data
 """
 
-import cProfile
-import argparse
 import os
 import time
 import multiprocessing
 import re
 
-from common import bmp, board, connect, dedupe, extract, util, vector
+from common import bmp, extract, util, vector
 from common.config import *
 
 
-def batch_process_photos(path, serialize, id, start_at_step, stop_before_step):
-    start_time = time.time()
+def process_photo(photo_path, working_dir):
+    """
+    Takes in a path to a photo of a part of the bed
+    Processes that photo into digital puzzle piece information
+    Stores intermediate results in the working directory
+    """
+    # 1 - segment into a binary BMP
+    bmp_path = os.path.join(working_dir, PHOTO_BMP_DIR, f'{os.path.basename(photo_path).split(".")[0]}.bmp')
+    bmp.photo_to_bmp(args=(photo_path, bmp_path))
 
+    # 2 - extract pieces from the binary BMP
+    extract_path = os.path.join(working_dir, SEGMENT_DIR)
+    extract.extract_pieces(args=(bmp_path, extract_path))
+
+    # 3 - vectorize the pieces
+    vector_path = os.path.join(working_dir, VECTOR_DIR)
+    vector.load_and_vectorize(args=(extract_path, 1, vector_path, True))
+
+
+def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_step=3):
+    """
+    Given a path to a working directory that contains a 0_input subdirectory full of photos
+    Batch processes them into digital puzzle piece information
+
+    start_at_step: the step to start processing at
+    stop_before_step: the step to stop processing at
+    id: only process the photo with this ID
+    """
     if start_at_step <= 0 and stop_before_step > 0:
-        bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
+        _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
 
     if start_at_step <= 1 and stop_before_step > 1:
-        extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
+        _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
-
-    duration = time.time() - start_time
-    print(f"\n\n{util.GREEN}### Batch processed photos in {round(duration, 2)} sec ###{util.WHITE}\n")
+        _vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
 
 
-def bmp_all(input_path, output_path, id):
+def _bmp_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
@@ -51,7 +71,7 @@ def bmp_all(input_path, output_path, id):
         pool.map(bmp.photo_to_bmp, args)
 
 
-def extract_all(input_path, output_path, id):
+def _extract_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
@@ -65,14 +85,13 @@ def extract_all(input_path, output_path, id):
     args = []
     for f in fs:
         input_img_path = os.path.join(input_path, f)
-        output_img_path = os.path.join(output_path)
-        args.append([input_img_path, output_img_path])
+        args.append([input_img_path, output_path])
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(extract.extract_pieces, args)
 
 
-def vectorize(input_path, output_path, id, serialize):
+def _vectorize(input_path, output_path, id, serialize):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
