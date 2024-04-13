@@ -1,3 +1,7 @@
+"""
+Entrypoint from the command line to batch process input photos then find a solution
+"""
+
 import cProfile
 import argparse
 import os
@@ -5,28 +9,9 @@ import time
 import multiprocessing
 import re
 
+import process, solve
 from common import bmp, board, connect, dedupe, extract, util, vector
 from common.config import *
-
-
-# Step 1 takes in photos of pieces on the bed and outputs binary BMPs of those photos
-PHOTOS_DIR = '0_photos'
-PHOTO_BMP_DIR = '1_photo_bmps'
-
-# Step 2 takes in photo BMPs and outputs cleaned up individual pieces as bitmaps
-SEGMENT_DIR = '2_segmented'
-
-# Step 4 takes in piece BMPs and outputs SVGs
-VECTOR_DIR = '3_vector'
-
-# Step 4 goes through all the vector pieces and deletes duplicates
-DEDUPED_DIR = '4_deduped'
-
-# Step 5 takes in SVGs and outputs a graph of connectivity
-CONNECTIVITY_DIR = '5_connectivity'
-
-# Step 6 takes in the graph of connectivity and outputs a solution
-SOLUTION_DIR = '6_solution'
 
 
 def prepare_new_run(path, start_at_step, stop_before_step):
@@ -60,16 +45,6 @@ def batch_process_photos(path, serialize, id, start_at_step, stop_before_step):
 
     duration = time.time() - start_time
     print(f"\n\n{util.GREEN}### Batch processed photos in {round(duration, 2)} sec ###{util.WHITE}\n")
-
-
-def solve(path):
-    start_time = time.time()
-
-    find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
-    build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
-
-    duration = time.time() - start_time
-    print(f"\n\n{util.GREEN}### Puzzle solved in {round(duration, 2)} sec ###{util.WHITE}\n")
 
 
 def bmp_all(input_path, output_path, id):
@@ -181,31 +156,6 @@ def build_board(input_path, output_path):
     print(f"Building the board took {round(duration, 2)} seconds")
 
 
-def rename(path):
-    d = os.path.join(path, PHOTOS_DIR)
-
-    # for each file in this directory, rename it to i.jpeg
-    i = 1
-
-    # only rename jpg or jpeg
-    previous_files = [f for f in os.listdir(d) if re.match(r'.*\.jpe?g', f)]
-    print(f"There are {len(previous_files)} files to rename")
-
-    for f in previous_files:
-        src = os.path.join(d, f)
-        dest = os.path.join(d, f'{i}.jpeg.tmp')
-        os.rename(src, dest)
-        i += 1
-
-    i = 1
-    for f in previous_files:
-        src = os.path.join(d, f'{i}.jpeg.tmp')
-        dest = os.path.join(d, f'{i}.jpeg')
-        os.rename(src, dest)
-        i += 1
-    print(f"Renamed {len(previous_files)} files")
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
@@ -217,8 +167,8 @@ def main():
 
     prepare_new_run(path=args.path, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
     batch_process_photos(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
-    if args.stop_before_step is not None and args.stop_before_step > 3:
-        solve(path=args.path)
+    if args.stop_before_step is not None and args.stop_before_step >= 3:
+        solve.solve(path=args.path)
 
 
 if __name__ == '__main__':
