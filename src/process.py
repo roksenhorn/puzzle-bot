@@ -11,11 +11,12 @@ from common import bmp, extract, util, vector
 from common.config import *
 
 
-def process_photo(photo_path, working_dir):
+def process_photo(photo_path, working_dir, robot_state):
     """
-    Takes in a path to a photo of a part of the bed
+    Takes in a path to a photo of a part of the bed and the robot's state when the photo was taken
     Processes that photo into digital puzzle piece information
     Stores intermediate results in the working directory
+    TODO: make use of robot_state
     """
     # 1 - segment into a binary BMP
     bmp_path = os.path.join(working_dir, PHOTO_BMP_DIR, f'{os.path.basename(photo_path).split(".")[0]}.bmp')

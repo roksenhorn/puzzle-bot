@@ -12,11 +12,10 @@ from common import util
 from common.config import *
 
 
-def prepare_new_run(path, start_at_step, stop_before_step):
+def _prepare_new_run(path, start_at_step, stop_before_step):
     for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
-        # remove .DS_Store files
         if os.path.exists(os.path.join(path, d, '.DS_Store')):
             os.remove(os.path.join(path, d, '.DS_Store'))
 
@@ -36,10 +35,13 @@ def main():
     args = parser.parse_args()
 
     start_time = time.time()
-    prepare_new_run(path=args.path, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+
+    _prepare_new_run(path=args.path, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+
     process.batch_process_photos(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
     if args.stop_before_step is not None and args.stop_before_step >= 3:
         solve.solve(path=args.path)
+
     duration = time.time() - start_time
     print(f"\n\n{util.GREEN}### Ran in {round(duration, 2)} sec ###{util.WHITE}\n")
 
