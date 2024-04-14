@@ -27,7 +27,7 @@ def _prepare_new_run(path, start_at_step, stop_before_step):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path', help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
+    parser.add_argument('--path', required=True, help='Path to the base directory that has a dir `0_input` full of JPEGs in it')
     parser.add_argument('--only-process-id', default=None, required=False, help='Only processes the provided ID', type=str)
     parser.add_argument('--start-at-step', default=0, required=False, help='Start processing at this step', type=int)
     parser.add_argument('--stop-before-step', default=10, required=False, help='Stop processing at this step', type=int)
@@ -47,7 +47,7 @@ def main():
 
 
 if __name__ == '__main__':
-    PROFILE = False
+    PROFILE = True
     if PROFILE:
         cProfile.run('main()', 'profile_results.prof')
     else:

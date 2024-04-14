@@ -30,7 +30,7 @@ def build(input_path, output_path):
         out = [r.get() for r in results]
 
     ps = { piece_id: piece for (piece_id, piece) in out }
-    _save(ps, output_path)
+    return _save(ps, output_path)
 
 
 def _find_potential_matches_for_piece(ps, piece_id, debug=False):
@@ -76,10 +76,11 @@ def _find_potential_matches_for_piece(ps, piece_id, debug=False):
         piece.fits[si] = [f for f in piece.fits[si] if f[2] <= least_error * WORST_MULTIPLIER]
 
         print(f"Piece {piece_id}[{si}] has {len(piece.fits[si])} matches, best: {least_error}")
-        nth = 8
-        if len(piece.fits[si]) > nth:
-            nth_match_error = piece.fits[si][nth - 1][2]
-            print(f"\t1st match error: {least_error} \t ==> {nth}th match error: {nth_match_error} \t ==> ratio: {nth_match_error / least_error}")
+        if debug:
+            nth = 8
+            if len(piece.fits[si]) > nth:
+                nth_match_error = piece.fits[si][nth - 1][2]
+                print(f"\t1st match error: {least_error} \t ==> {nth}th match error: {nth_match_error} \t ==> ratio: {nth_match_error / least_error}")
 
     return (piece_id, piece)
 
@@ -89,3 +90,4 @@ def _save(pieces, out_directory):
     path = os.path.join(out_directory, 'connectivity.json')
     with open(path, 'w') as f:
         json.dump(out, f)
+    return out

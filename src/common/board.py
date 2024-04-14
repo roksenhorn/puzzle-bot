@@ -1,5 +1,5 @@
 import os
-import yaml
+import json
 import math
 import heapq
 
@@ -159,10 +159,19 @@ class Board(object):
         return self.placed_count < other.placed_count
 
 
-def build(input_path, output_path):
-    print("> Loading connectivity graph...")
-    with open(os.path.join(input_path, 'connectivity.json'), 'r') as f:
-        ps_raw = yaml.safe_load(f)
+def build(connectivity=None, input_path=None, output_path=None):
+    """
+    Builds the puzzle
+    Takes in either a path to a directory that contains the connectivity graph, or the connectivity graph itself
+    TODO: somehow pass the output along
+    """
+    if connectivity is None:
+        print("> Loading connectivity graph...")
+        with open(os.path.join(input_path, 'connectivity.json'), 'r') as f:
+            ps_raw = json.load(f)
+    else:
+        print("> Using provided connectivity graph...")
+        ps_raw = connectivity
 
     ps = {}
     for piece_id, fits in ps_raw.items():

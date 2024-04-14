@@ -61,10 +61,10 @@ def deduplicate(input_path, output_path):
             sorted_side_lens = sorted(dupe_side_lens.items(), key=lambda x: (x[1], x[0]))
             best_dupe = sorted_side_lens[0][0]
             uniques.add(best_dupe)
-            print(f"\t Keeping {best_dupe} with len {sorted_side_lens[0][1]}")
+            # print(f"\t Keeping {best_dupe} with len {sorted_side_lens[0][1]}")
             for j in sorted_side_lens[1:]:
                 dupes.add(j[0])
-                print(f"\t Removing {j[0]} with len {j[1]}")
+                # print(f"\t Removing {j[0]} with len {j[1]}")
 
     print(f"Started with {len(pieces)}; found {len(dupes)} duplicate pieces; resulting in {len(uniques)} unique pieces.")
 

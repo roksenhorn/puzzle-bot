@@ -15,8 +15,8 @@ def solve(path):
     TODO: return a path to the solution?
     """
     _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
-    _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
-    _build_board(input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR))
+    connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+    _build_board(connectivity=connectivity, output_path=os.path.join(path, SOLUTION_DIR))
 
 
 def _deduplicate(input_path, output_path):
@@ -36,18 +36,19 @@ def _find_connectivity(input_path, output_path):
     """
     print(f"\n{util.RED}### 4 - Building connectivity ###{util.WHITE}\n")
     start_time = time.time()
-    connect.build(input_path, output_path)
+    connectivity = connect.build(input_path, output_path)
     duration = time.time() - start_time
     print(f"Building the graph took {round(duration, 2)} seconds")
+    return connectivity
 
 
-def _build_board(input_path, output_path):
+def _build_board(connectivity, output_path):
     """
     Searches connectivity to find the solution
     """
     print(f"\n{util.RED}### 5 - Build board ###{util.WHITE}\n")
     start_time = time.time()
-    board.build(input_path, output_path)
+    board.build(connectivity=connectivity, output_path=output_path)
     duration = time.time() - start_time
     print(f"Building the board took {round(duration, 2)} seconds")
 
