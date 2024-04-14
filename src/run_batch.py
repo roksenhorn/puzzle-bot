@@ -47,7 +47,7 @@ def main():
 
 
 if __name__ == '__main__':
-    PROFILE = True
+    PROFILE = False
     if PROFILE:
         cProfile.run('main()', 'profile_results.prof')
     else:
