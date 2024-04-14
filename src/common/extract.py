@@ -1,10 +1,9 @@
 import os
 import PIL
+import numpy as np
 
 from common import util
-
-
-MIN_PIECE_AREA = 100 * 100
+from common.config import *
 
 
 def extract_pieces(args):
@@ -12,9 +11,11 @@ def extract_pieces(args):
     Returns how many pieces were extracted
     """
     input_path, output_path = args
+
+    print(f"> Extracting pieces from {input_path.split('/')[-1]}")
     pixels, _, _ = util.load_bmp_as_binary_pixels(input_path)
 
-    islands = util.find_islands(pixels, ignore_islands_along_border=True)
+    islands = util.find_islands(pixels, min_island_area=MIN_PIECE_AREA, ignore_islands_along_border=True)
     output_paths = []
 
     piece_id = 1
@@ -29,46 +30,36 @@ def extract_pieces(args):
     return output_paths
 
 
-def _clean_and_save_piece(piece_coordinates, output_path):
+def _clean_and_save_piece(pixels, output_path):
     """
-    Returns whether or not the piece was considered valid and was saved
+    Pad the piece with a border, clean it a bit, and save it as a BMP
+    Returns False if the piece was rejected
     """
-
-    # reject noise in the image that is clearly too small to be a piece
-    if len(piece_coordinates) < MIN_PIECE_AREA:
-        return False
-
-    xs = [x for (x, _) in piece_coordinates]
-    ys = [y for (_, y) in piece_coordinates]
-    minx, miny, maxx, maxy = min(xs), min(ys), max(xs), max(ys)
-    width = maxx - minx + 1
-    height = maxy - miny + 1
-
-    # pad the image with a border
-    BORDER_WIDTH_PX = 1
-    width += (2 * BORDER_WIDTH_PX)
-    height += (2 * BORDER_WIDTH_PX)
-
     # reject islands that are really narrow, like a seem along an edge that was picked up incorrectly
-    if width < 0.26 * height or height < 0.25 * width:
+    w, h = pixels.shape
+    if w < 0.25 * h or h < 0.25 * w:
         # print(f"Skipping piece {piece_id} because it is too thin")
         return False
 
-    pixels = []
-    for i in range(height):
-        pixels.append([])
-        for j in range(width):
-            pixels[i].append(0) # start with an all black background
-
-    for (x, y) in piece_coordinates:
-        xx = x - minx + BORDER_WIDTH_PX
-        yy = y - miny + BORDER_WIDTH_PX
-        pixels[yy][xx] = 1
+    # pad the pixels with a black border for processing
+    pixels = np.pad(pixels, pad_width=1, mode='constant', constant_values=0)
 
     # clean up any thin strands of pixels like hairs or dust
-    util.remove_stragglers(pixels, width, height)
+    util.remove_stragglers(pixels)
 
-    img = PIL.Image.new('1', (width, height))
-    img.putdata([pixel for row in pixels for pixel in row])
+    # trim the piece to the smallest bounding box
+    rows = np.any(pixels, axis=1)
+    cols = np.any(pixels, axis=0)
+    rmin, rmax = np.where(rows)[0][[0, -1]]
+    cmin, cmax = np.where(cols)[0][[0, -1]]
+    pixels = pixels[rmin:rmax+1, cmin:cmax+1]
+
+    # re-pad the pixels with a black border
+    pixels = np.pad(pixels, pad_width=1, mode='constant', constant_values=0)
+
+    # save a binary bitmpa
+    w, h = pixels.shape
+    img = PIL.Image.new('1', (h, w))
+    img.putdata(pixels.flatten())
     img.save(output_path)
     return True

@@ -5,6 +5,9 @@ from shapely.geometry import Polygon, Point, LineString
 import numpy as np
 import numpy as np
 from collections import deque
+from scipy.ndimage import label, find_objects
+
+from common.config import *
 
 
 YELLOW = '\033[33m'
@@ -567,7 +570,7 @@ def sublist_exists(lst, sub_lst):
     return sub_lst_str in lst_extended_str
 
 
-def find_islands(grid, callback=None, ignore_islands_along_border=True, island_value=1):
+def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIECE_AREA):
     """
     Given a grid of 0s and 1s, finds all "islands" of 1s:
     00000000
@@ -583,42 +586,37 @@ def find_islands(grid, callback=None, ignore_islands_along_border=True, island_v
 
     Returns either a list of islands, or a list of Trues if a callback was provided
     """
-    visited = np.zeros_like(grid, dtype=bool)
+    # 8-connectivity - touching any other 1 on a side or corner
+    structure = np.array([[1, 1, 1],
+                          [1, 1, 1],
+                          [1, 1, 1]])
+
+    # to find connected components
+    labeled_array, num_features = label(grid, structure=structure)
+
+    # Optional: Extract slices for each island
+    slices = find_objects(labeled_array)
     islands = []
-    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-    w, h = grid.shape
+    for i, s in enumerate(slices, start=1):
+        # Create a mask for the current island within the slice
+        mask = (labeled_array[s] == i)
+        # Apply the mask to the slice to extract only the current island
+        island = grid[s] * mask
+        islands.append(island)
 
-    for y in range(h):
-        for x in range(w):
-            if grid[x, y] == island_value and not visited[x, y]:
-                island = []
-                queue = deque([(x, y)])
-                touched_border = x == 0 or y == 0 or x == w - 1 or y == h - 1
+    # filter out any islands that touch the border
+    if ignore_islands_along_border:
+        h, w = grid.shape
+        for i in range(num_features):
+            if slices[i][0].start == 0 or slices[i][0].stop == h or slices[i][1].start == 0 or slices[i][1].stop == w:
+                islands[i] = None
 
-                while queue:
-                    cx, cy = queue.popleft()
-                    if not visited[cx, cy]:
-                        visited[cx, cy] = True
-                        island.append((cy, cx))
+    # filter out tiny islands
+    for i, island in enumerate(islands):
+        if island is not None and island.sum() < min_island_area:
+            islands[i] = None
 
-                        for dx, dy in directions:
-                            nx, ny = cx + dx, cy + dy
-                            if 0 <= nx < w and 0 <= ny < h and grid[nx, ny] == island_value:
-                                queue.append((nx, ny))
-                                if nx == 0 or ny == 0 or nx == w - 1 or ny == h - 1:
-                                    touched_border = True
-
-                if ignore_islands_along_border and touched_border:
-                    continue
-
-                if callback:
-                    ok = callback(island, len(islands))
-                    if ok:
-                        islands.append(True)
-                else:
-                    islands.append(island)
-
-    return islands
+    return [island for island in islands if island is not None]
 
 
 def render_polygons(vertices_list: List[List[Tuple[int, int]]], bounds=None) -> None:
@@ -736,47 +734,41 @@ def normalized_area_between_corners(vertices):
     return sum_distances / len(vertices)
 
 
-def remove_stragglers(pixels, width, height) -> bool:
+def remove_stragglers(pixels):
     """
-    Given an array of binary pixels, removes any pixels that are "dangling" and only connected to one or two other pixels
-    Returns True if any were removed
+    Given a 2D array of binary pixels (already padded), removes any pixels that are "dangling"
+    and only connected to one or two other pixels.
+    Also fills "cracks" that are a hairline wide of 0s surrounded by at least 6 pixels of 1s.
+    Requires the input image to be padded with 0s around the border
+    Returns True if any modifications were made.
     """
     removed = False
+    height, width = pixels.shape[0] - 2, pixels.shape[1] - 2  # Adjust for padding
 
-    for y in range(1, height - 1):
-        for x in range(1, width - 1):
-            # All 8 neighbors
-            above_left = pixels[y - 1][x - 1]
-            above = pixels[y - 1][x]
-            above_right = pixels[y - 1][x + 1]
-            right = pixels[y][x + 1]
-            below_right = pixels[y + 1][x + 1]
-            below = pixels[y + 1][x]
-            below_left = pixels[y + 1][x - 1]
-            left = pixels[y][x - 1]
-            neighbors = [
-                above_left,
-                above,
-                above_right,
-                right,
-                below_right,
-                below,
-                below_left,
-                left,
-            ]
-            neighbor_ones = [True for n in neighbors if n == 1]
-            v = pixels[y][x]
+    # Extract sub-arrays for each neighbor position (avoiding the added padding in calculations)
+    neighbors = [pixels[y:y+height, x:x+width]
+                 for y in range(3) for x in range(3) if not (y == 1 and x == 1)]
 
-            if v == 1 and len(neighbor_ones) <= 2:
-                # straggler only connected by one
-                pixels[y][x] = 0
-                removed = True
+    # Sum the values of all neighbors
+    neighbor_sum = sum(neighbors)
 
-            # also find "cracks" that are a hairline wide of 0s
-            if v == 0 and len(neighbor_ones) >= 6:
-                pixels[y][x] = 1
+    # Middle part of pixels (avoiding padded edges) for processing
+    core_pixels = pixels[1:-1, 1:-1]
 
+    # Detect and remove stragglers (pixels with 1 or 2 neighbors)
+    stragglers = (core_pixels == 1) & (neighbor_sum <= 2)
+    if np.any(stragglers):
+        core_pixels[stragglers] = 0
+        removed = True
+
+    # Detect and fill cracks (0s with 6 or more neighbors)
+    cracks = (core_pixels == 0) & (neighbor_sum >= 6)
+    if np.any(cracks):
+        core_pixels[cracks] = 1
+        removed = True
+
+    # Recurse if changes were made
     if removed:
-        return remove_stragglers(pixels, width, height)
+        return remove_stragglers(pixels)
 
     return False
