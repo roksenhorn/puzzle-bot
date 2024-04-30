@@ -51,7 +51,7 @@ def get_photo_orientation(img):
             if tag in ExifTags.TAGS:
                 if ExifTags.TAGS[tag] == 'Orientation':
                     return value
-    return 1
+    return None
 
 
 def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
@@ -59,7 +59,7 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     Given a bitmap image path, returns a 2D array of 1s and 0s
     """
     with Image.open(path) as img:
-        if (orientation := get_photo_orientation(img)) != EXPECTED_PHOTO_ORIENTATION:
+        if (orientation := get_photo_orientation(img)) is not None and orientation != EXPECTED_PHOTO_ORIENTATION:
             raise Exception(f"Image {path} is not oriented correctly: {orientation}")
 
         w, h = img.size
