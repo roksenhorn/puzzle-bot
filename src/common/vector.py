@@ -31,9 +31,9 @@ SCALAR = 5.0
 
 
 def load_and_vectorize(args):
-    filename, id, output_path, metadata, render = args
+    filename, id, output_path, metadata, photo_space_position, scale_factor, render = args
     v = Vector.from_file(filename, id)
-    return v.process(output_path, metadata, render)
+    return v.process(output_path, metadata, photo_space_position, scale_factor, render)
 
 
 class Candidate(object):
@@ -148,7 +148,7 @@ class Vector(object):
         self.corners = []
         self.filename = filename
 
-    def process(self, output_path=None, metadata={}, render=False):
+    def process(self, output_path=None, metadata={}, photo_space_position=(0, 0), scale_factor=1.0, render=False):
         print(f"> Vectorizing piece {self.id}")
         self.find_border_raster()
         self.vectorize()
@@ -163,6 +163,11 @@ class Vector(object):
 
         if render:
             self.render()
+
+        # find the incenter of the piece in the space of the un-scaled original photo
+        photo_space_incenter = (photo_space_position[0] + (self.incenter[0] / scale_factor),
+                                photo_space_position[1] + (self.incenter[1] / scale_factor))
+        metadata["photo_space_incenter"] = photo_space_incenter
 
         if output_path:
             self.save(output_path, metadata)

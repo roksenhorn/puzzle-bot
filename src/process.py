@@ -30,16 +30,17 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
 
     # 2 - extract pieces from the binary BMP
     extract_path = os.path.join(working_dir, SEGMENT_DIR)
-    extracted_paths, extracted_pixel_space_origins = extract.extract_pieces(args=(bmp_path, extract_path, scale_factor))
+    extracted_paths, extracted_photo_space_positions = extract.extract_pieces(args=(bmp_path, extract_path, scale_factor))
 
     # 3 - vectorize the pieces from each of the extracted bitmaps
     piece_id = starting_piece_id
     args = []
     for i, f in enumerate(extracted_paths):
         piece_metadata = metadata.copy()
-        piece_metadata['pixel_space_origin'] = extracted_pixel_space_origins[i]
+        photo_space_position = extracted_photo_space_positions[i]
+        piece_metadata["photo_space_origin"] = photo_space_position
         vector_path = os.path.join(working_dir, VECTOR_DIR)
-        args.append((f, piece_id, vector_path, piece_metadata, False))
+        args.append((f, piece_id, vector_path, piece_metadata, photo_space_position, scale_factor, False))
         piece_id += 1
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(vector.load_and_vectorize, args)

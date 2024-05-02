@@ -17,20 +17,20 @@ def extract_pieces(args):
 
     islands = util.find_islands(pixels, min_island_area=MIN_PIECE_AREA, ignore_islands_along_border=True)
     output_paths = []
-    output_pixel_space_origins = []
+    output_photo_space_positions = []
 
     piece_id = 1
     for island, origin in islands:
         unique_id = input_path.split('/')[-1].split('.')[0]
         piece_output_path = os.path.join(output_path, f'{unique_id}_{piece_id}.bmp')
-        ok, pixel_space_origin = _clean_and_save_piece(island, piece_output_path, origin, scale_factor)
+        ok, photo_space_position = _clean_and_save_piece(island, piece_output_path, origin, scale_factor)
         if ok:
             output_paths.append(piece_output_path)
-            output_pixel_space_origins.append(pixel_space_origin)
+            output_photo_space_positions.append(photo_space_position)
             piece_id += 1
 
     print(f"> Extracted {len(output_paths)} pieces from {input_path.split('/')[-1]}")
-    return output_paths, output_pixel_space_origins
+    return output_paths, output_photo_space_positions
 
 
 def _clean_and_save_piece(pixels, output_path, origin, scale_factor):
@@ -58,14 +58,15 @@ def _clean_and_save_piece(pixels, output_path, origin, scale_factor):
     pixels = pixels[rmin:rmax+1, cmin:cmax+1]
 
     # re-pad the pixels with a black border
-    pixels = np.pad(pixels, pad_width=1, mode='constant', constant_values=0)
+    PAD_BY = 1
+    pixels = np.pad(pixels, pad_width=PAD_BY, mode='constant', constant_values=0)
 
-    pixel_space_origin = (origin[0] / scale_factor, origin[1] / scale_factor)
-    print(f"Piece origin: {pixel_space_origin}")
+    # unscale the origin
+    photo_space_position = (origin[0] / scale_factor, origin[1] / scale_factor)
 
     # save a binary bitmpa
     w, h = pixels.shape
     img = PIL.Image.new('1', (h, w))
     img.putdata(pixels.flatten())
     img.save(output_path)
-    return True, pixel_space_origin
+    return True, photo_space_position
