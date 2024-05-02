@@ -8,7 +8,7 @@ from common.config import *
 
 def photo_to_bmp(args):
     input_photo_filename, output_bmp_filename = args
-    segment(input_photo_filename, output_bmp_filename)
+    return segment(input_photo_filename, output_bmp_filename)
 
 
 def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=SEG_THRESH, crop=True):
@@ -27,13 +27,14 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=S
     clean: whether to clean up the image iwth some post-processing
     """
     print(f"> Segmenting photo `{input_photo_filename}` into `{output_path}`")
-    bw_pixels, width, height = util.binary_pixel_data_for_photo(input_photo_filename,
-                                                                threshold=threshold, max_width=width,
-                                                                crop=CROP_TRBL if crop else 0)
+    bw_pixels, width, height, scale_factor = util.binary_pixel_data_for_photo(input_photo_filename,
+                                                                              threshold=threshold, max_width=width,
+                                                                              # cropping will mess with the scaling math that we use later on
+                                                                              crop=0)
     if output_path:
         _save(output_path, bw_pixels, width, height)
 
-    return (bw_pixels, width, height)
+    return (bw_pixels, width, height, scale_factor)
 
 
 def _save(output_path, bw_pixels, width, height):

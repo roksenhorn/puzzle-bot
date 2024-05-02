@@ -22,7 +22,9 @@ def main():
     for f in os.listdir(args.input_path):
         if f.endswith('.jpg') or f.endswith('.jpeg'):
             print(f"{util.YELLOW}### Processing {f} ###{util.WHITE}")
-            robot_state = {}  # TODO
+            robot_state = {
+                "robot_x": 0, "robot_y": 0,
+            }
             piece_id = process.process_photo(photo_path=os.path.join(args.input_path, f), working_dir=args.working_dir, starting_piece_id=piece_id, robot_state=robot_state)
 
     print("Solving")
