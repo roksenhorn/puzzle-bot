@@ -16,26 +16,32 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
     Takes in a path to a photo of a part of the bed and the robot's state when the photo was taken
     Processes that photo into digital puzzle piece information
     Stores intermediate results in the working directory
-    TODO: make use of robot_state
 
     Returns the final piece ID
     """
+    metadata = {
+        "robot_state": robot_state,
+    }
+
     # 1 - segment into a binary BMP
     bmp_path = os.path.join(working_dir, PHOTO_BMP_DIR, f'{os.path.basename(photo_path).split(".")[0]}.bmp')
-    bmp.photo_to_bmp(args=(photo_path, bmp_path))
+    _, _, _, scale_factor = bmp.photo_to_bmp(args=(photo_path, bmp_path))
+    metadata['scale_factor'] = scale_factor
 
     # 2 - extract pieces from the binary BMP
     extract_path = os.path.join(working_dir, SEGMENT_DIR)
-    extracted_paths = extract.extract_pieces(args=(bmp_path, extract_path))
+    extracted_paths, extracted_photo_space_positions = extract.extract_pieces(args=(bmp_path, extract_path, scale_factor))
 
     # 3 - vectorize the pieces from each of the extracted bitmaps
     piece_id = starting_piece_id
     args = []
-    for f in extracted_paths:
+    for i, f in enumerate(extracted_paths):
+        piece_metadata = metadata.copy()
+        photo_space_position = extracted_photo_space_positions[i]
+        piece_metadata["photo_space_origin"] = photo_space_position
         vector_path = os.path.join(working_dir, VECTOR_DIR)
-        args.append((f, piece_id, vector_path, False))
+        args.append((f, piece_id, vector_path, piece_metadata, photo_space_position, scale_factor, False))
         piece_id += 1
-
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
         pool.map(vector.load_and_vectorize, args)
 

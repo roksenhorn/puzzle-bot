@@ -67,8 +67,9 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
             raise Exception(f"Image {path} is portrait, not landscape")
 
         if max_width is not None and img.size[0] > max_width:
+            scale_factor = max_width / img.size[0]
             try:
-                img.thumbnail((max_width, img.size[1]), resample=Image.NEAREST)
+                img = img.resize((max_width, int(img.size[1] * scale_factor)), resample=Image.NEAREST)
             except Exception as e:
                 print(f"Error resizing {path}")
                 raise e
@@ -77,7 +78,8 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
             w, h = img.size
             img = img.crop((crop[3], crop[0], w - crop[1], h - crop[2]))
 
-        return threshold_pixels(img, threshold)
+        data, out_w, out_h = threshold_pixels(img, threshold)
+        return data, out_w, out_h, scale_factor
 
 
 def threshold_pixels(img, threshold):
@@ -588,7 +590,7 @@ def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIE
     :param ignore_islands_along_border: if True, islands that touch the border of the grid will be ignored
     :param island_value: the value that represents an island in the grid (1 or 0)
 
-    Returns either a list of islands, or a list of Trues if a callback was provided
+    Returns either a list of tuples: each island paired with its origin
     """
     # 8-connectivity - touching any other 1 on a side or corner
     structure = np.array([[1, 1, 1],
@@ -601,14 +603,16 @@ def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIE
     # Optional: Extract slices for each island
     slices = find_objects(labeled_array)
     islands = []
+    origins = []
     for i, s in enumerate(slices, start=1):
         # Create a mask for the current island within the slice
         mask = (labeled_array[s] == i)
         # Apply the mask to the slice to extract only the current island
         island = grid[s] * mask
         islands.append(island)
+        origins.append((s[1].start, s[0].start))
 
-    # filter out any islands that touch the border
+    # filter out any islands that touch the border (they're likely to be cropped pieces)
     if ignore_islands_along_border:
         h, w = grid.shape
         for i in range(num_features):
@@ -620,7 +624,13 @@ def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIE
         if island is not None and island.sum() < min_island_area:
             islands[i] = None
 
-    return [island for island in islands if island is not None]
+    # zip the islands with their origins
+    output = []
+    for i, island in enumerate(islands):
+        if island is not None:
+            output.append((island, origins[i]))
+
+    return output
 
 
 def render_polygons(vertices_list: List[List[Tuple[int, int]]], bounds=None) -> None:

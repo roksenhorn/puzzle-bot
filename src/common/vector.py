@@ -31,9 +31,9 @@ SCALAR = 5.0
 
 
 def load_and_vectorize(args):
-    filename, id, output_path, render = args
+    filename, id, output_path, metadata, photo_space_position, scale_factor, render = args
     v = Vector.from_file(filename, id)
-    return v.process(output_path, render)
+    return v.process(output_path, metadata, photo_space_position, scale_factor, render)
 
 
 class Candidate(object):
@@ -148,7 +148,7 @@ class Vector(object):
         self.corners = []
         self.filename = filename
 
-    def process(self, output_path=None, render=False):
+    def process(self, output_path=None, metadata={}, photo_space_position=(0, 0), scale_factor=1.0, render=False):
         print(f"> Vectorizing piece {self.id}")
         self.find_border_raster()
         self.vectorize()
@@ -164,12 +164,17 @@ class Vector(object):
         if render:
             self.render()
 
+        # find the incenter of the piece in the space of the un-scaled original photo
+        photo_space_incenter = (photo_space_position[0] + (self.incenter[0] / scale_factor),
+                                photo_space_position[1] + (self.incenter[1] / scale_factor))
+        metadata["photo_space_incenter"] = photo_space_incenter
+
         if output_path:
-            self.save(output_path)
+            self.save(output_path, metadata)
         else:
             return self
 
-    def save(self, output_path) -> None:
+    def save(self, output_path, metadata) -> None:
         # We generate an SVG of the piece for debugging
         d = SCALAR / 2.0  # scale the SVG down by this denominator
         colors = ['cc0000', '999900', '00aa99', '3300bb']
@@ -198,9 +203,14 @@ class Vector(object):
             side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
             # convert vertices from np types to native python types
             vertices = [[int(v[0]), int(v[1])] for v in side.vertices]
-            data = {'piece_id': self.id, 'side_index': i, 'vertices': vertices, 'piece_center': list(side.piece_center), 'is_edge': side.is_edge, 'incenter': list(self.incenter)}
+            metadata['piece_id'] = self.id
+            metadata['side_index'] = i
+            metadata['vertices'] = vertices
+            metadata['piece_center'] = list(side.piece_center)
+            metadata['is_edge'] = side.is_edge
+            metadata['incenter'] = list(self.incenter)
             with open(side_path, 'w') as f:
-                f.write(json.dumps(data))
+                f.write(json.dumps(metadata))
 
     def find_border_raster(self) -> None:
         # Ensure pixels is a numpy array

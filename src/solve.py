@@ -4,6 +4,7 @@ Given a path to processed piece data, finds a solution
 
 import os
 import time
+import json
 
 from common import board, connect, dedupe, util
 from common.config import *
@@ -16,7 +17,7 @@ def solve(path):
     """
     _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
     connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
-    _build_board(connectivity=connectivity, output_path=os.path.join(path, SOLUTION_DIR))
+    _build_board(connectivity=connectivity, output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
 
 
 def _deduplicate(input_path, output_path):
@@ -42,7 +43,7 @@ def _find_connectivity(input_path, output_path):
     return connectivity
 
 
-def _build_board(connectivity, output_path):
+def _build_board(connectivity, output_path, metadata_path):
     """
     Searches connectivity to find the solution
     """
@@ -51,4 +52,19 @@ def _build_board(connectivity, output_path):
     board.build(connectivity=connectivity, output_path=output_path)
     duration = time.time() - start_time
     print(f"Building the board took {round(duration, 2)} seconds")
+
+    # Save off the solution for how each piece must be moved
+    # TODO - this is a mock implementation!
+    dest_incenters = [(555, 444)] * 1000
+    dest_rotations = [0.123] * 1000
+    for i in range(1, 1001):
+        dest_incenters[i] = 0.123
+        dest_rotations[i] = 0.123
+        for j in range(4):
+            path = os.path.join(metadata_path, f'side_{i}_{j}.json')
+            with open(path, 'rw') as f:
+                metadata = json.load(f)
+                metadata['dest_photo_space_incenter'] = dest_incenters[i]
+                metadata['dest_rotation'] = dest_rotations[i]
+                json.dump(metadata, f)
 
