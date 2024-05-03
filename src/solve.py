@@ -58,13 +58,13 @@ def _build_board(connectivity, output_path, metadata_path):
     dest_incenters = [(555, 444)] * 1000
     dest_rotations = [0.123] * 1000
     for i in range(1, 1001):
-        dest_incenters[i] = 0.123
-        dest_rotations[i] = 0.123
         for j in range(4):
-            path = os.path.join(metadata_path, f'side_{i}_{j}.json')
-            with open(path, 'rw') as f:
+            metadata_input_path = os.path.join(metadata_path, f'side_{i}_{j}.json')
+            solution_output_path = os.path.join(output_path, f'side_{i}_{j}.json')
+            with open(metadata_input_path, 'r') as f:
                 metadata = json.load(f)
-                metadata['dest_photo_space_incenter'] = dest_incenters[i]
-                metadata['dest_rotation'] = dest_rotations[i]
+                metadata['dest_photo_space_incenter'] = dest_incenters[i-1]
+                metadata['dest_rotation'] = dest_rotations[i-1]
+            with open(solution_output_path, 'w') as f:
                 json.dump(metadata, f)
 
