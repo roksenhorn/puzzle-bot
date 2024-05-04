@@ -158,7 +158,7 @@ class Vector(object):
             self.extract_four_sides()
         except Exception as e:
             self.render()
-            print(f"Error while processing {self.id}:")
+            print(f"Error while processing id {self.id} in file {self.filename}:")
             raise e
 
         if render:

@@ -254,6 +254,10 @@ def counterclockwise_angle_between_vectors(h, i, j):
            θ <--- angle
            i
     """
+    # No two points may be the same. If they are, it's likely from noisy data and we should error.
+    if (h == i) or (h == j) or (i == j):
+        raise Exception(f"counterclockwise_angle_between_vectors: no points may be identical {h} {i} {j}")
+    
     # shift the vectors to be based at i
     v1 = (h[0] - i[0], h[1] - i[1])
     v2 = (j[0] - i[0], j[1] - i[1])

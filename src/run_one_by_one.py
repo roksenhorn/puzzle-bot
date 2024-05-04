@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Example of running by invoking with one photo at a time
 """
