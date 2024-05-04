@@ -173,6 +173,14 @@ def compare_angles(angle1, angle2):
     return min(diff, 2*math.pi - diff)
 
 
+def average_angles(angle1, angle2):
+    # return the average of two angles, wrapping appropriately
+    # e.g. avg(0, pi) = pi/2
+    # e.g. avg(0, 2*pi) = 0
+    delta = compare_angles(angle1, angle2)
+    return (angle1 + delta / 2) % (2 * math.pi)
+
+
 def centroid(polygon):
     """
     Calculates the centroid of a polygon.
@@ -227,6 +235,27 @@ def intersection(line1, line2):
         return int(round(xi)), int(round(yi))
 
 
+def rotate_polyline(polyline, around_point, angle):
+    """
+    Rotates a polyline around a point by a given angle.
+    :param polyline: List of (x,y) tuples representing the polyline.
+    :param around_point: Tuple (x,y) representing the point to rotate around.
+    :param angle: The angle to rotate the polyline by.
+    :return: List of (x,y) tuples representing the rotated polyline.
+    """
+    return [rotate(point, around_point, angle) for point in polyline]
+
+
+def translate_polyline(polyline, translation):
+    """
+    Translates a polyline by a given translation.
+    :param polyline: List of (x,y) tuples representing the polyline.
+    :param translation: Tuple (x,y) representing the translation.
+    :return: List of (x,y) tuples representing the translated polyline.
+    """
+    return [(point[0] + translation[0], point[1] + translation[1]) for point in polyline]
+
+
 def slice(l: List, i: int, j: int) -> List:
     """
     Grabs a slice from the list, from index i through j
@@ -257,7 +286,7 @@ def counterclockwise_angle_between_vectors(h, i, j):
     # No two points may be the same. If they are, it's likely from noisy data and we should error.
     if (h == i) or (h == j) or (i == j):
         raise Exception(f"counterclockwise_angle_between_vectors: no points may be identical {h} {i} {j}")
-    
+
     # shift the vectors to be based at i
     v1 = (h[0] - i[0], h[1] - i[1])
     v2 = (j[0] - i[0], j[1] - i[1])

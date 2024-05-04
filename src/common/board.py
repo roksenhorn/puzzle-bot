@@ -91,12 +91,10 @@ class Board(object):
             return False, f"Cannot place {piece_id} at ({x}, {y}) because it is already occupied by {self._board[y][x][0]}"
 
         sides_that_must_be_edges = self._sides_that_must_be_edges(x, y)
-        # print(f"\t\tPlacing {piece_id} @ ori {orientation} @ ({x}, {y}) requires sides {sides_that_must_be_edges} to be edges")
         for side_i in range(4):
             expect_edge = side_i in sides_that_must_be_edges
             rotated_i = (side_i - orientation) % 4
             fits_i = fits[rotated_i]
-            # print(f"\t\t    checking side {side_i}, which rotates to fits[{rotated_i}]")
             is_edge = len(fits_i) == 0
             if not is_edge and expect_edge:
                 return False, f"Cannot place {piece_id} at ({x}, {y}) because side @ index {rotated_i} is not an edge piece"
@@ -158,6 +156,9 @@ class Board(object):
     def __lt__(self, other):
         return self.placed_count < other.placed_count
 
+    def get(self, x, y):
+        return self._board[y][x]
+
 
 def build(connectivity=None, input_path=None, output_path=None):
     """
@@ -198,19 +199,19 @@ def build(connectivity=None, input_path=None, output_path=None):
         raise Exception(f"Expected {edge_length} pieces on the edge, got {len(edges)}")
 
     success = False
+    solution = None
     for i in range(0, 4):
         try:
-            build_from_corner(ps, start_piece_id=corners[i])
+            solution = build_from_corner(ps, start_piece_id=corners[i])
         except Exception as e:
             print(f"Failed to build from corner {i}: {e}")
             continue
         success = True
         break
 
-    if success:
-        print("SUCCESS!")
-    else:
+    if not success:
         raise Exception("Failed to solve")
+    return solution
 
 def build_from_corner(ps, start_piece_id):
     print(f"\n===============================\nBuilding from corner {start_piece_id}...")
@@ -233,8 +234,7 @@ def build_from_corner(ps, start_piece_id):
     while priority_q:
         priority, data = heapq.heappop(priority_q)
         board, start_piece_id, start_orientation, x, y, direction = data
-        # print(f"({x}, {y}) moving {direction}")
-        if iteration % 50 == 0:
+        if iteration % 100 == 0:
             print("\n" * 40)
             print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
@@ -247,14 +247,11 @@ def build_from_corner(ps, start_piece_id):
 
         index_of_neighbor_in_direction = (direction - start_orientation) % 4
         iteration += 1
-        # print(f'Checking neighbors of {start_piece_id}[{index_of_neighbor_in_direction}] @ ori {start_orientation} --> checking: {ps[start_piece_id][index_of_neighbor_in_direction]}\n================')
 
         for neighbor_piece_id, neighbor_side_index, error in ps[start_piece_id][index_of_neighbor_in_direction]:
             neighbor_orientation = (OPPOSITE[direction] - neighbor_side_index) % 4
-            # print(f'\t {neighbor_piece_id}[{neighbor_side_index}] @ ori {neighbor_orientation}')
             ok, err = board.can_place(piece_id=neighbor_piece_id, fits=ps[neighbor_piece_id], x=x, y=y, orientation=neighbor_orientation)
             if ok:
-                # print(">>> OK! \t Adding to priority queue")
                 next_board = Board.copy(board)
                 next_board.place(neighbor_piece_id, ps[neighbor_piece_id], x, y, neighbor_orientation)
                 next_direction = direction
@@ -262,7 +259,6 @@ def build_from_corner(ps, start_piece_id):
                 next_y = y + (1 if next_direction == BOTTOM else -1 if next_direction == TOP else 0)
 
                 if not next_board.is_available(next_x, next_y):
-                    # print(">>> ROTATING DIRECTION ~~~~~~~~~~")
                     # if we can't go further in this direction, time to turn
                     next_direction = (direction + 1) % 4
                     next_x = x + (1 if next_direction == RIGHT else -1 if next_direction == LEFT else 0)
@@ -274,10 +270,10 @@ def build_from_corner(ps, start_piece_id):
     if board.placed_count == PUZZLE_WIDTH * PUZZLE_HEIGHT:
         print(f"Found solution after {iteration} iterations!")
         print(board)
+        return board
     else:
         raise Exception(f"No solution found after {iteration} iterations, longest found: {longest}")
 
-import random
 
 def _orient_start_corner_to_top_left(p):
     if len(p[0]) == 0 and len(p[1]) == 0:
