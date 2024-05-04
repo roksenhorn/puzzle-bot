@@ -17,7 +17,7 @@ def extract_pieces(args):
 
     islands = util.find_islands(pixels, min_island_area=MIN_PIECE_AREA, ignore_islands_along_border=True)
     output_paths = []
-    output_photo_space_positions = []
+    output_photo_space_positions = {}
 
     piece_id = 1
     for island, origin in islands:
@@ -26,7 +26,7 @@ def extract_pieces(args):
         ok, photo_space_position = _clean_and_save_piece(island, piece_output_path, origin, scale_factor)
         if ok:
             output_paths.append(piece_output_path)
-            output_photo_space_positions.append(photo_space_position)
+            output_photo_space_positions[piece_output_path] = photo_space_position
             piece_id += 1
 
     print(f"> Extracted {len(output_paths)} pieces from {input_path.split('/')[-1]}")

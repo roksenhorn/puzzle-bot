@@ -25,7 +25,7 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
 
     # 1 - segment into a binary BMP
     bmp_path = os.path.join(working_dir, PHOTO_BMP_DIR, f'{os.path.basename(photo_path).split(".")[0]}.bmp')
-    _, _, _, scale_factor = bmp.photo_to_bmp(args=(photo_path, bmp_path))
+    scale_factor = bmp.photo_to_bmp(args=(photo_path, bmp_path))
     metadata['scale_factor'] = scale_factor
 
     # 2 - extract pieces from the binary BMP
@@ -35,9 +35,9 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
     # 3 - vectorize the pieces from each of the extracted bitmaps
     piece_id = starting_piece_id
     args = []
-    for i, f in enumerate(extracted_paths):
+    for f in extracted_paths:
         piece_metadata = metadata.copy()
-        photo_space_position = extracted_photo_space_positions[i]
+        photo_space_position = extracted_photo_space_positions[f]
         piece_metadata["photo_space_origin"] = photo_space_position
         vector_path = os.path.join(working_dir, VECTOR_DIR)
         args.append((f, piece_id, vector_path, piece_metadata, photo_space_position, scale_factor, False))
@@ -57,14 +57,25 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
     stop_before_step: the step to stop processing at
     id: only process the photo with this ID
     """
+    metadata = { "robot_state": {} }
+
     if start_at_step <= 0 and stop_before_step > 0:
-        _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
+        scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
+    else:
+        scale_factor = 1.0
 
+    metadata['scale_factor'] = scale_factor
+
+    photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:
-        _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), id=id)
+        output = _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), scale_factor=scale_factor, id=id)
+        photo_space_positions_list = [o[1] for o in output]
+        for d in photo_space_positions_list:
+            photo_space_positions.update(d)
 
+    print(photo_space_positions)
     if start_at_step <= 2 and stop_before_step > 2:
-        _vectorize(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, VECTOR_DIR), id=id, serialize=serialize)
+        _vectorize(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
 
 
 def _bmp_all(input_path, output_path, id):
@@ -86,10 +97,13 @@ def _bmp_all(input_path, output_path, id):
         args.append([input_img_path, output_img_path])
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-        pool.map(bmp.photo_to_bmp, args)
+        # capture the output from each call to photo_to_bmp
+        output = pool.map(bmp.photo_to_bmp, args)
+
+    return output[0]
 
 
-def _extract_all(input_path, output_path, id):
+def _extract_all(input_path, output_path, scale_factor, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
@@ -103,13 +117,15 @@ def _extract_all(input_path, output_path, id):
     args = []
     for f in fs:
         input_img_path = os.path.join(input_path, f)
-        args.append([input_img_path, output_path])
+        args.append([input_img_path, output_path, scale_factor])
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-        pool.map(extract.extract_pieces, args)
+        output = pool.map(extract.extract_pieces, args)
+
+    return output
 
 
-def _vectorize(input_path, output_path, id, serialize):
+def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_factor, id, serialize):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
@@ -125,7 +141,10 @@ def _vectorize(input_path, output_path, id, serialize):
             continue
         path = os.path.join(input_path, f)
         render = (i == id)
-        args.append([path, i, output_path, render])
+        photo_space_position = photo_space_positions[path]
+        piece_metadata = metadata.copy()
+        piece_metadata["photo_space_origin"] = photo_space_position
+        args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
         i += 1
         if id is not None:
