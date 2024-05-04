@@ -173,12 +173,47 @@ def compare_angles(angle1, angle2):
     return min(diff, 2*math.pi - diff)
 
 
-def average_angles(angle1, angle2):
-    # return the average of two angles, wrapping appropriately
-    # e.g. avg(0, pi) = pi/2
-    # e.g. avg(0, 2*pi) = 0
-    delta = compare_angles(angle1, angle2)
-    return (angle1 + delta / 2) % (2 * math.pi)
+def average_angles(angles):
+    """
+    Calculate the average angle from a list of angles, taking into account the circular nature of angles.
+    We compute the average by converting each angle into its vector representation on the unit circle
+    (using sin and cos), then averaging these vectors to find the resultant vector. The angle of this resultant
+    vector is then converted back to degrees as the average angle. This method ensures that the average angle
+    properly accounts for the wrap-around at 0 degrees (360 degrees).
+    >>> average_angles([358, 2]) => 0.0
+    >>> average_angles([90, 270]) => 180.0
+    >>> average_angles([10, 20, 30]) => 20.0
+    """
+    if not angles:
+        return None
+
+    sum_sin = 0
+    sum_cos = 0
+
+    for angle in angles:
+        angle = angle % 2 * math.pi
+        # Sum up the sine and cosine values
+        sum_sin += math.sin(angle)
+        sum_cos += math.cos(angle)
+
+    # Calculate average sine and cosine values
+    avg_sin = sum_sin / len(angles)
+    avg_cos = sum_cos / len(angles)
+
+    # Calculate the average angle from the average sine and cosine
+    if avg_cos == 0:
+        if avg_sin > 0:
+            average_angle = math.pi / 2  # 90 degrees
+        else:
+            average_angle = 3 * math.pi / 2  # 270 degrees
+    else:
+        average_angle = math.atan2(avg_sin, avg_cos)
+
+    # Convert the average angle from radians back to degrees
+    average_angle = math.degrees(average_angle)
+
+    # Ensure the average angle is non-negative
+    return average_angle if average_angle >= 0 else average_angle + 360
 
 
 def centroid(polygon):
@@ -473,11 +508,27 @@ def tight_bounds(poly1, poly2):
     )
 
 
+def subtract(p1, p2):
+    """
+    Returns p1 - p2
+    """
+    return (p1[0] - p2[0], p1[1] - p2[1])
+
+
 def midpoint(p1, p2):
     """
     Returns the midpoint between two points
     """
     return ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
+
+
+def multimidpoint(ps):
+    """
+    Returns the midpoint between multiple points
+    """
+    x = sum([p[0] for p in ps]) / len(ps)
+    y = sum([p[1] for p in ps]) / len(ps)
+    return x, y
 
 
 def midpoint_along_path(vertices, p1, p2) -> Tuple[int, int]:

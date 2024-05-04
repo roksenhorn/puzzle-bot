@@ -17,7 +17,8 @@ def solve(path):
     """
     _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
     connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
-    _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
+    puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
+    _move_pieces_into_place(puzzle=puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
 
 def _deduplicate(input_path, output_path):
@@ -52,151 +53,211 @@ def _build_board(connectivity, input_path, output_path, metadata_path):
     puzzle = board.build(connectivity=connectivity, input_path=input_path, output_path=output_path)
     duration = time.time() - start_time
     print(f"Finding where each piece goes took {round(duration, 2)} seconds")
+    return puzzle
 
-    # Now we must compute how each piece must be moved, from its original photo space to the final board location
-    # We start at the top left corner:
-    # We define the origin of the solution space to be the top left corner of that piece
-    # and we rotate that piece to be orthogonal with the solution space axes (+x to the right, +y down)
-    # we then place the next piece to the right of the first piece,
-    # translating and rotating it so it lines up with the first piece's right edge
-    # the orientation of sides walks clockwise:
-    #
-    #     ----T--->
-    #    ^         |
-    #    |         R
-    #    L         |
-    #    |         V
-    #     <---B----
+
+def _move_pieces_into_place(puzzle, metadata_path, output_path):
+    """
+    Compute how each piece must be moved from its original photo space to the final board location
+
+    We first align border pieces with a virtual edge to the solution is bounded to a perfect rectangle
+    As we place pieces, we rotate and translate them to fit snuggly against their neighbors
+
+    We work our way clockwise around the border, then spiral inward
+
+    For a given peice, the the orientation of that piece's sides walks clockwise:
+
+            (0)
+        ----Top--->
+       ^           |
+       |          Right (1)
+    Left (3)       |
+       |           V
+       <----Bot----
+            (2)
+    """
+    # We'll store how each piece is rotated (around its incenter) then translated
     rotations = {}
     incenters = {}
 
-    debug_sides = []
+    viz_data = []
 
-    prior_row_bottoms = [[(100, 0), (0, 0)]] * puzzle.width
-    print(prior_row_bottoms)
+    placed_pieces = {}
 
-    for y in range(puzzle.height):
-        if y > 150:
-            break
+    # We'll place pieces by wrapping around the puzzle's border, starting at the top left corner
+    # and rotating clockwise around the border, then spiraling inward
+    x, y = (0, 0)
+    direction = (+1, 0) # we start by moving right (+1 in the x)
+    for i in range(puzzle.width * puzzle.height):
+        piece_id, _, orientation = puzzle.get(x, y)
+        print(f"> Placing Piece {piece_id} in spot [{x}, {y}], in orientation {orientation}")
 
-        # at the start of each row, we reset the left neighbor to a virtual piece that's just a straight line down
-        neighbor_above = prior_row_bottoms[0]
-        h = neighbor_above[-1][1]  # this is side B, so grab the last vertex's (left-most) y coordinate
-        neighbor_left = [(0, h), (0, h + 100)]  # vertical pointing down (side R)
-        this_row_bottoms = []
-        for x in range(puzzle.width):
-            neighbor_above = prior_row_bottoms[x]
-            neighbor_above_angle = util.angle_between(neighbor_above[0], neighbor_above[-1]) % (2 * math.pi)
-            neighbor_left_angle = util.angle_between(neighbor_left[0], neighbor_left[-1]) % (2 * math.pi)
+        # if we're placing a border piece, we create a virtual piece beyond the border for perfect rectangular alignment
+        if y == 0:  # top border: create a fake bottom side above
+            placed_pieces[(x, y - 1)] = [[], [], [(100, 0), (0, 0)], []]  # `Bottom` side points right
+        if x == 0:  # left border: create a fake right side to the left
+            placed_pieces[(x - 1, y)] = [[], [(0, 0), (0, 100)], [], []]  # `Right` side points down
+        if x == puzzle.width - 1:  # right border: create a fake left side to the right
+            placed_pieces[(x + 1, y)] = [[], [], [], [(100, 100), (100, 0)]]  # `Left` side points up
+        if y == puzzle.height - 1:  # bottom border: create a fake top side below
+            placed_pieces[(x, y + 1)] = [[(0, 1000), (100, 1000)], [], [], []]  # `Top` side points left
 
-            piece_id, _, orientation = puzzle.get(x, y)
-            print(f"\n=============\n[{x}, {y}] {piece_id} @ {orientation}")
+        # Extract relevant sides from any neighbors that have already been placed (including fake pieces for the border)
+        neighbor_above = placed_pieces.get((x, y - 1), [[], [], [], []])[2]  # grab the bottom side of the neighbor above us
+        neighbor_right = placed_pieces.get((x + 1, y), [[], [], [], []])[3]  # grab the left side of the neighbor to our right
+        neighbor_below = placed_pieces.get((x, y + 1), [[], [], [], []])[0]  # grab the top side of the neighbor below us
+        neighbor_left = placed_pieces.get((x - 1, y), [[], [], [], []])[1]  # grab the right side of the neighbor to our left
 
-            # open the piece's metadata
-            sides = []
-            for i in range(4):
-                with open(os.path.join(metadata_path, f'side_{piece_id}_{i}.json'), 'r') as f:
-                    sides.append(json.load(f))
+        # compute the orientation of the neighbor so we know how we need to be oriented to plug into that neighbor
+        neighbor_above_angle = util.angle_between(neighbor_above[0], neighbor_above[-1]) % (2 * math.pi) if neighbor_above else None
+        neighbor_right_angle = util.angle_between(neighbor_right[0], neighbor_right[-1]) % (2 * math.pi) if neighbor_right else None
+        neighbor_below_angle = util.angle_between(neighbor_below[0], neighbor_below[-1]) % (2 * math.pi) if neighbor_below else None
+        neighbor_left_angle = util.angle_between(neighbor_left[0], neighbor_left[-1]) % (2 * math.pi) if neighbor_left else None
 
-            side_angles = []
-            for side in sides:
-                vertices = side['vertices']
-                angle = util.angle_between(vertices[0], vertices[-1]) % (2 * math.pi)
-                side_angles.append(angle)
+        # load our piece's side data
+        sides = []
+        for i in range(4):
+            with open(os.path.join(metadata_path, f'side_{piece_id}_{i}.json'), 'r') as f:
+                sides.append(json.load(f))
 
-            # rotate the piece such that side 0 ends up in `orientation`, and all the other sides are rotated accordingly
-            if orientation == 0:
-                # we're in the correct orientation
-                new_top = 0
-                new_right = 1
-                new_bottom = 2
-                new_left = 3
-            elif orientation == 1:
-                # our top is pointing to the left (side 3), so we need to rotate the piece 90° clockwise
-                new_top = 3
-                new_right = 0
-                new_bottom = 1
-                new_left = 2
-            elif orientation == 2:
-                # our top is on the bottom (side 2), so we need to rotate the piece 180°
-                new_top = 2
-                new_right = 3
-                new_bottom = 0
-                new_left = 1
-            elif orientation == 3:
-                # our top is pointing to the right (side 1), so we need to rotate the piece 90° counterclockwise
-                new_top = 1
-                new_right = 2
-                new_bottom = 3
-                new_left = 0
+        # what angle is each side currently at?
+        side_angles = []
+        for side in sides:
+            vertices = side['vertices']
+            angle = util.angle_between(vertices[0], vertices[-1]) % (2 * math.pi)
+            side_angles.append(angle)
 
-            # compute how much each side wants to rotate to oppose their neighbors
-            # if we're along the top edge, we make sure we align to the top neighbor
-            # if we're along the left edge, we make sure we align to the left neighbor
-            # this helps prevent error from stacking up as we solve across the board
-            top_side_rotation = (neighbor_above_angle - side_angles[new_top] - math.pi)
-            left_side_rotation = (neighbor_left_angle - side_angles[new_left] - math.pi)
-            if y == 0:
-                rotation = top_side_rotation
-            elif x == 0:
-                rotation = left_side_rotation
-            elif x == puzzle.width - 1:
-                # at the end of the row, let's make sure the last piece's right wall is vertical
-                angle_of_new_right_side = side_angles[new_right]
-                rotation = -angle_of_new_right_side + math.pi / 2
+        # we need to rotate the piece such that side 0 ends up in `orientation`, and all the other sides are rotated accordingly
+        # `new_top`` is the index into `sides` that we want to be the top side after rotation, connecting to the neighbor above's bottom
+        if orientation == 0:
+            # we're in the correct orientation
+            new_top = 0
+            new_right = 1
+            new_bottom = 2
+            new_left = 3
+        elif orientation == 1:
+            # our top is pointing to the left (side 3), so we need to rotate the piece 90° clockwise
+            new_top = 3
+            new_right = 0
+            new_bottom = 1
+            new_left = 2
+        elif orientation == 2:
+            # our top is on the bottom (side 2), so we need to rotate the piece 180°
+            new_top = 2
+            new_right = 3
+            new_bottom = 0
+            new_left = 1
+        elif orientation == 3:
+            # our top is pointing to the right (side 1), so we need to rotate the piece 90° counterclockwise
+            new_top = 1
+            new_right = 2
+            new_bottom = 3
+            new_left = 0
+
+        # compute how much each side wants to rotate to oppose their neighbors, and align to one of the neighbors
+        top_side_rotation = (neighbor_above_angle - side_angles[new_top] - math.pi) if neighbor_above else None
+        right_side_rotation = (neighbor_right_angle - side_angles[new_right] - math.pi) if neighbor_right else None
+        bottom_side_rotation = (neighbor_below_angle - side_angles[new_bottom] - math.pi) if neighbor_below else None
+        left_side_rotation = (neighbor_left_angle - side_angles[new_left] - math.pi) if neighbor_left else None
+        if direction == (1, 0):
+            rotation = top_side_rotation
+        elif direction == (0, 1):
+            rotation = right_side_rotation
+        elif direction == (-1, 0):
+            rotation = bottom_side_rotation
+        elif direction == (0, -1):
+            rotation = left_side_rotation
+
+        # actually rotate the sides, around our incenter
+        rotated_sides = []
+        for side in sides:
+            rotated_side = util.rotate_polyline(side['vertices'], around_point=side["incenter"], angle=rotation)
+            rotated_sides.append(rotated_side)
+
+        # Now we'll compute how much to translate
+        # but first, for border pieces, we need to know where the virtual neighbors would be
+        # we previously made fake neighbor sides for the border to get the angle right
+        # let's update the fake neighbors to match the actual positions these pieces should go
+        if y == 0:
+            origin = neighbor_left[0]
+            w = rotated_sides[new_top][-1][0] - rotated_sides[new_top][0][0]
+            neighbor_above = [(origin[0] + w, origin[1]), origin]
+        if x == puzzle.width - 1:
+            origin = neighbor_above[0]
+            h = rotated_sides[new_right][-1][1] - rotated_sides[new_right][0][1]
+            neighbor_right = [(origin[0], origin[1] + h), origin]
+        if y == puzzle.height - 1:
+            origin = neighbor_right[0]
+            w = rotated_sides[new_bottom][-1][0] - rotated_sides[new_bottom][0][0]
+            neighbor_below = [(origin[0] - w, origin[1]), origin]
+        if x == 0 and y != 0:
+            if y == puzzle.height - 1:
+                # bottom left corner needs to x-align with the width and y=align with the height
+                origin = neighbor_right[0]
+                w = rotated_sides[new_bottom][0][0] - rotated_sides[new_bottom][-1][0]
+                origin = (origin[0] - w, origin[1])
             else:
-                rotation = util.average_angles(top_side_rotation, left_side_rotation)
+                origin = neighbor_below[0]
+            h = rotated_sides[new_left][-1][1] - rotated_sides[new_left][0][1]
+            neighbor_left = [(origin[0], origin[1] - h), origin]
 
+        # to get the best alignment, we want to average how much we'd need to translate to each of our existing neighbors
+        samples = []
+        if neighbor_above:
+            samples.append(util.subtract(neighbor_above[-1], rotated_sides[new_top][0]))
+        if neighbor_right:
+            samples.append(util.subtract(neighbor_right[-1], rotated_sides[new_right][0]))
+        if neighbor_below:
+            samples.append(util.subtract(neighbor_below[-1], rotated_sides[new_bottom][0]))
+        if neighbor_left:
+            samples.append(util.subtract(neighbor_left[-1], rotated_sides[new_left][0]))
 
-            print(f"Neighbor above @ {neighbor_above_angle * 180 / math.pi}°")
-            print(f"Neighbor to left @ {neighbor_left_angle * 180 / math.pi}°")
-            print(f"New top = side {new_top} @ {side_angles[new_top] * 180 / math.pi}°, should oppose {neighbor_above_angle * 180 / math.pi}° => rotate it {top_side_rotation * 180 / math.pi}°")
-            print(f"New left = side {new_left} @ {side_angles[new_left] * 180 / math.pi}°, should oppose {neighbor_left_angle * 180 / math.pi}° => rotate it {left_side_rotation * 180 / math.pi}°")
-            mismatch = util.compare_angles(top_side_rotation, left_side_rotation)
-            # if mismatch > 8 * math.pi / 180:
-            #     raise Exception(f"Rotation mismatch: {mismatch * 180 / math.pi} > 8°: {top_side_rotation * 180 / math.pi}° vs {left_side_rotation * 180 / math.pi}°")
+        if x == 0 and y == 0:
+            # make sure the first piece actually ends up at (0, 0)
+            translation = util.subtract((0, 0), rotated_sides[new_top][0])
+        else:
+            # all other pieces will be translated by the average of how much they need to move to connect to each neighbor
+            translation = util.multimidpoint(samples)
 
-            rotated_sides = []
-            for side in sides:
-                rotated_side = util.rotate_polyline(side['vertices'], around_point=side["incenter"], angle=rotation)
-                new_side = {"vertices": rotated_side, "is_edge": side["is_edge"], "solution_x": x, "solution_y": y}
-                rotated_sides.append(new_side)
-                debug_sides.append(new_side)
+        # perform the translation
+        incenter = (sides[0]["incenter"][0] + translation[0], sides[0]["incenter"][1] + translation[1])
+        translated_rotated_sides = [util.translate_polyline(side, translation) for side in rotated_sides]
 
-            # translate the piece to the correct position by pulling the intersection point of the two neighbors
-            neighbor_left_origin = neighbor_left[0]
-            if y > 0:
-                neighbor_above_origin = neighbor_above[-1]
-                start_origin = ((neighbor_left_origin[0] + neighbor_above_origin[0]) / 2, (neighbor_left_origin[1] + neighbor_above_origin[1]) / 2)
-                end_origin = neighbor_above[0]
-                start_translation = (start_origin[0] - rotated_sides[new_left]["vertices"][-1][0], start_origin[1] - rotated_sides[new_left]["vertices"][-1][1])
-                end_translation = (end_origin[0] - rotated_sides[new_top]["vertices"][-1][0], end_origin[1] - rotated_sides[new_top]["vertices"][-1][1])
-                translation = ((start_translation[0] + end_translation[0]) / 2, (start_translation[1] + end_translation[1]) / 2)
-            else:
-                # for the first row, we don't have real neighbors above us
-                translation = (neighbor_left_origin[0] - rotated_sides[new_left]["vertices"][-1][0], neighbor_left_origin[1] - rotated_sides[new_left]["vertices"][-1][1])
-            incenter = (sides[0]["incenter"][0] + translation[0], sides[0]["incenter"][1] + translation[1])
-            print(f"\nNeighbor left's start: {neighbor_left[0]}")
-            print(f"Piece's left's start: {rotated_sides[new_left]['vertices'][0]}")
-            print(f"incenter from {sides[0]['incenter']} to {incenter} by {translation}")
-            print(f"Rotating piece {piece_id} by {rotation * 180 / math.pi}° and translating by {translation}")
-            for side in rotated_sides:
-                side["vertices"] = util.translate_polyline(side["vertices"], translation)
-                side["incenter"] = incenter
+        # place the piece so future pieces have neighbors to grab onto
+        placed_pieces[(x, y)] = [
+            translated_rotated_sides[new_top],
+            translated_rotated_sides[new_right],
+            translated_rotated_sides[new_bottom],
+            translated_rotated_sides[new_left]
+        ]
+        rotations[piece_id] = rotation
+        incenters[piece_id] = incenter
+        print(f"\t > Rotate by {round(rotation * 180 / math.pi, 1)}° and translate by {translation}")
 
-            rotations[piece_id] = rotation
-            incenters[piece_id] = incenter
+        # save off data for visualization purposes
+        viz_data.append({"vertices": translated_rotated_sides[new_top], "is_edge": y == 0, "incenter": incenter})
+        viz_data.append({"vertices": translated_rotated_sides[new_right], "is_edge": x == puzzle.width - 1, "incenter": incenter})
+        viz_data.append({"vertices": translated_rotated_sides[new_bottom], "is_edge": y == puzzle.height - 1, "incenter": incenter})
+        viz_data.append({"vertices": translated_rotated_sides[new_left], "is_edge": x == 0, "incenter": incenter})
 
-            neighbor_left = rotated_sides[new_right]["vertices"]
-            this_row_bottoms.append(rotated_sides[new_bottom]["vertices"])
-
-        prior_row_bottoms = this_row_bottoms
+        # when we hit the bounds or a piece we've placed, spiral around the boarder, inward
+        next_x, next_y = x + direction[0], y + direction[1]
+        if next_x < 0 or next_x >= puzzle.width or next_y < 0 or next_y >= puzzle.height or placed_pieces.get((next_x, next_y)):
+            if direction == (+1, 0):
+                direction = (0, +1)
+            elif direction == (0, +1):
+                direction = (-1, 0)
+            elif direction == (-1, 0):
+                direction = (0, -1)
+            elif direction == (0, -1):
+                direction = (+1, 0)
+        x, y = (x + direction[0], y + direction[1])
 
     # generate a giant debug SVG of the final board
     svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-    svg += f'<svg width="3000" height="3000" viewBox="-10 -10 3020 3020" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+    svg += f'<svg width="3000" height="2000" viewBox="-10 -10 3020 2020" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
     colors = ['cc0000', '999900', '00aa99', '3300bb']
-    for i, side in enumerate(debug_sides):
+    for i, side in enumerate(viz_data):
         pts = ' '.join([','.join([str(e / 5.0) for e in v]) for v in side["vertices"]])
         stroke_width = 1.5 if side["is_edge"] else 1.0
         dash = 'stroke-dasharray="9,3"' if side["is_edge"] else ''
@@ -207,14 +268,13 @@ def _build_board(connectivity, input_path, output_path, metadata_path):
     with open(output_path + "/board.svg", 'w') as f:
         f.write(svg)
 
-    for i in range(1, 1001):
+    for piece_id in rotations.keys():
         for j in range(4):
-            metadata_input_path = os.path.join(metadata_path, f'side_{i}_{j}.json')
-            solution_output_path = os.path.join(output_path, f'side_{i}_{j}.json')
+            metadata_input_path = os.path.join(metadata_path, f'side_{piece_id}_{j}.json')
+            solution_output_path = os.path.join(output_path, f'side_{piece_id}_{j}.json')
             with open(metadata_input_path, 'r') as f:
                 metadata = json.load(f)
-                metadata['dest_rotation'] = rotations[i-1]
-                metadata['dest_photo_space_incenter'] = incenters[i-1]
+                metadata['dest_rotation'] = rotations[piece_id]
+                metadata['dest_photo_space_incenter'] = incenters[piece_id]
             with open(solution_output_path, 'w') as f:
                 json.dump(metadata, f)
-
