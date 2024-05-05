@@ -159,7 +159,7 @@ def _build_board(connectivity, input_path, output_path, metadata_path):
             rotated_sides = []
             for side in sides:
                 rotated_side = util.rotate_polyline(side['vertices'], around_point=side["incenter"], angle=rotation)
-                new_side = {"vertices": rotated_side, "is_edge": side["is_edge"]}
+                new_side = {"vertices": rotated_side, "is_edge": side["is_edge"], "solution_x": x, "solution_y": y}
                 rotated_sides.append(new_side)
                 debug_sides.append(new_side)
 
