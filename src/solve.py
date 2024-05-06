@@ -79,6 +79,7 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
     # We'll store how each piece is rotated (around its incenter) then translated
     rotations = {}
     incenters = {}
+    xys = {}
 
     viz_data = []
 
@@ -232,6 +233,7 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         ]
         rotations[piece_id] = rotation
         incenters[piece_id] = incenter
+        xys[piece_id] = (x, y)
         print(f"\t > Rotate by {round(rotation * 180 / math.pi, 1)}° and translate by {translation}")
 
         # save off data for visualization purposes
@@ -276,5 +278,7 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
                 metadata = json.load(f)
                 metadata['dest_rotation'] = rotations[piece_id]
                 metadata['dest_photo_space_incenter'] = incenters[piece_id]
+                metadata['solution_x'] = xys[piece_id][0]
+                metadata['solution_y'] = xys[piece_id][1]
             with open(solution_output_path, 'w') as f:
                 json.dump(metadata, f)
