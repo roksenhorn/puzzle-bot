@@ -230,6 +230,7 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         outputs[piece_id] = {
             "photo_space_origin": sides[0]["photo_space_origin"],
             "photo_space_incenter": sides[0]["photo_space_incenter"],
+            "robot_state": sides[0]["robot_state"],
             "dest_photo_space_incenter": incenter,
             "dest_rotation": rotation,
             "solution_x": x,
