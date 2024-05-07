@@ -77,12 +77,8 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
             (2)
     """
     # We'll store how each piece is rotated (around its incenter) then translated
-    rotations = {}
-    incenters = {}
-    xys = {}
-
+    outputs = {}
     viz_data = []
-
     placed_pieces = {}
 
     # We'll place pieces by wrapping around the puzzle's border, starting at the top left corner
@@ -231,9 +227,12 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
             translated_rotated_sides[new_bottom],
             translated_rotated_sides[new_left]
         ]
-        rotations[piece_id] = rotation
-        incenters[piece_id] = incenter
-        xys[piece_id] = (x, y)
+        outputs[piece_id] = {
+            'dest_photo_space_incenter': incenter,
+            'dest_rotation': rotation,
+            'solution_x': x,
+            'solution_y': y
+        }
         print(f"\t > Rotate by {round(rotation * 180 / math.pi, 1)}° and translate by {translation}")
 
         # save off data for visualization purposes
@@ -267,18 +266,10 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         if i % 4 == 0:
             svg += f'<circle cx="{side["incenter"][0] / 5.0}" cy="{side["incenter"][1] / 5.0}" r="{1.0}" style="fill:#bb4400; stroke-width:0" />'
     svg += '</svg>'
-    with open(output_path + "/board.svg", 'w') as f:
+    with open(os.path.join(output_path, "board.svg"), 'w') as f:
         f.write(svg)
 
-    for piece_id in rotations.keys():
-        for j in range(4):
-            metadata_input_path = os.path.join(metadata_path, f'side_{piece_id}_{j}.json')
-            solution_output_path = os.path.join(output_path, f'side_{piece_id}_{j}.json')
-            with open(metadata_input_path, 'r') as f:
-                metadata = json.load(f)
-                metadata['dest_rotation'] = rotations[piece_id]
-                metadata['dest_photo_space_incenter'] = incenters[piece_id]
-                metadata['solution_x'] = xys[piece_id][0]
-                metadata['solution_y'] = xys[piece_id][1]
-            with open(solution_output_path, 'w') as f:
-                json.dump(metadata, f)
+    for piece_id, output in outputs.items():
+        piece_output_path = os.path.join(output_path, f'{piece_id}.json')
+        with open(piece_output_path, 'w') as f:
+            json.dump(output, f)
