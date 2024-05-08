@@ -193,7 +193,7 @@ class Vector(object):
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
         svg += '</svg>'
-        filename = self.filename.split('/')[-1].split('.')[0]
+        filename = self.filename.split(os.path.sep)[-1].split('.')[0]
         svg_path = os.path.join(output_path, f"{self.id}_{filename}.svg")
         with open(svg_path, 'w') as f:
             f.write(svg)

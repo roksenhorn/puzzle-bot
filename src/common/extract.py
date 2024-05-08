@@ -21,7 +21,7 @@ def extract_pieces(args):
 
     piece_id = 1
     for island, origin in islands:
-        unique_id = input_path.split('/')[-1].split('.')[0]
+        unique_id = input_path.split(os.path.sep)[-1].split('.')[0]
         piece_output_path = os.path.join(output_path, f'{unique_id}_{piece_id}.bmp')
         ok, photo_space_position = _clean_and_save_piece(island, piece_output_path, origin, scale_factor)
         if ok:

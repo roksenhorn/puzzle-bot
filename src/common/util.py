@@ -35,7 +35,7 @@ def load_bmp_as_binary_pixels(path):
         pixels = np.array(img.getdata())
 
         # if the image is RGB or RGBA, convert to binary
-        if type(pixels[0]) != np.int64 and len(pixels[0]) >= 3:
+        if type(pixels[0]) not in [np.int64, np.int32] and len(pixels[0]) >= 3:
             pixels = np.array([sum(p[:3]) / 3 for p in pixels])
 
     # Reshape to 2D and convert to 1s and 0s
