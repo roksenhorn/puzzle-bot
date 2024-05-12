@@ -288,7 +288,7 @@ class Vector(object):
                     break
 
             if bx == cx and by == cy:
-                raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")   
+                raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")
 
         self.centroid = util.centroid(self.vertices)
         self.incenter = util.incenter(self.vertices)
