@@ -288,27 +288,7 @@ class Vector(object):
                     break
 
             if bx == cx and by == cy:
-                raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")
-
-        # Filter out any "outie" noise, these are lone pixels caused by dust (etc) laying next to the 
-        # piece that get detected as vertices. These are filterable because the vertices will leave the piece
-        # at a certain point, wrap around the "outie", and come back to the piece at the same point. So
-        # If we detect two identical locations within a few vertices of each other, we delete the "outie" 
-        # points that are in between, and delete the redundant vertice.
-        filtered_list = []
-        for i, v in enumerate(self.vertices):
-            v_minus_one = self.vertices[i-1] # prior vertice (wraps around correctly)
-            v_plus_one = self.vertices((i+1)%len(self.vertices)) # next vertice (wraps around correctly)
-            # If we see an identical vertice coming up soon, don't add this vertice to the filtered list
-            if v_plus_one == v:
-                continue
-            # If we see identical vertices before and after this one, don't add this vertice to the filtered list
-            if v_plus_one == v_minus_one:
-                continue
-            # Otherwise, add this vertice to the filtered list
-            filtered_list.append(v)
-        # Finally replace the vertices list with our filtered list.
-        self.vertices = filtered_list    
+                raise Exception(f"Piece @ {self.id} will get us stuck in a loop because the border goes up to the edge of the bitmap. Take a new picture with the piece centered better or make sure the background is brighter white.")   
 
         self.centroid = util.centroid(self.vertices)
         self.incenter = util.incenter(self.vertices)
