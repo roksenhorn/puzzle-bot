@@ -6,6 +6,9 @@ Example of running by invoking with one photo at a time
 import cProfile
 import argparse
 import os
+import posixpath
+import json
+from scipy import ndimage
 
 import process, solve
 from common import util
@@ -32,7 +35,12 @@ def main():
             x,y,z = [d['position'] for d in batch_info['photos'] if d['file_name'] == f][0]
             robot_state = dict(photo_at_motor_position=[x,y,z])
             # Process photo
-            piece_id = process.process_photo(photo_path=os.path.join(args.input_path, f), working_dir=args.working_dir, starting_piece_id=piece_id, robot_state=robot_state)
+            piece_id = process.process_photo(
+                photo_path=os.path.join(args.input_path, f), 
+                working_dir=args.working_dir, 
+                starting_piece_id=piece_id, 
+                robot_state=robot_state
+            )
 
     print("Solving")
     solve.solve(path=args.working_dir)
