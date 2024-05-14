@@ -8,7 +8,7 @@ import PIL
 from common import extract, util
 
 
-DUPLICATE_THRESHOLD = 6.0
+DUPLICATE_THRESHOLD = 8.0
 SEGMENT_DIR = '2_segmented'
 
 
@@ -16,7 +16,7 @@ def dedupe_on_bmps(path):
     os.makedirs(os.path.join(path, "2a_segmented"), exist_ok=True)
     os.makedirs(os.path.join(path, "2b_thumbnails"), exist_ok=True)
 
-    fill_islands(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "2a_segmented"))
+    # fill_islands(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "2a_segmented"))
     thumbnail(input_path=os.path.join(path, "2a_segmented"), output_path=os.path.join(path, "2b_thumbnails"))
     ssd(input_path=os.path.join(path, "2b_thumbnails"))
 
@@ -106,6 +106,7 @@ def _find_islands(grid, callback=None, ignore_islands_along_border=False, island
 
 
 def thumbnail(input_path, output_path):
+    print("Creating thumbnails...")
     fs = [f for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
     args = []
     for f in fs:
@@ -124,17 +125,25 @@ def _thumbnail(args):
     w, h = img.size[0] // 5, img.size[1] // 5
     img.thumbnail((w, h), PIL.Image.NEAREST)
     img = img.convert('1')
-    img = img.crop((0, 0, 140, 140))
-    img.save(output_path)
+
+    # Calculate the padding size
+    padding_width = (140 - img.size[0]) // 2
+    padding_height = (140 - img.size[1]) // 2
+
+    # Create a new image with the desired size and paste the thumbnail in the center
+    padded_img = PIL.Image.new('1', (140, 140))
+    padded_img.paste(img, (padding_width, padding_height))
+    padded_img.save(output_path)
 
 
 def ssd(input_path):
+    print("Running SSD between all thumbnails...")
     fs = [os.path.join(input_path, f) for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
     images = [util.load_bmp_as_binary_pixels(f)[0] for f in fs]
 
     dupes = set()
     keeps = set()
-    debug = {}
+    debug = []
 
     for i, img in enumerate(images):
         if i in dupes:
@@ -147,20 +156,17 @@ def ssd(input_path):
             fi = fs[i].split('/')[-1].split('.')[0]
             fj = fs[j].split('/')[-1].split('.')[0]
             if ssd_score < DUPLICATE_THRESHOLD:
-                print(f"SSD between {fi} and {fj} is {ssd_score}")
                 dupes.add(j)
-                if fi not in debug:
-                    debug[fi] = []
-                debug[fi].append(fj)
+                debug.append((fi, fj, ssd_score))
 
         keeps.add(i)
 
     print(f"Starting with {len(images)} images")
     print(f"Removing {len(dupes)} images")
     print(f"Resulting in {len(keeps)} images")
-    for i, l in debug.items():
-        debug_str = ','.join(l)
-        print(f"> Duplicates of {i}: {debug_str}")
+    debug = sorted(debug, key=lambda x: x[2])
+    for i, j, s in debug:
+        print(f"> Duplicate @ {s}: \t {i}.bmp {j}.bmp")
 
 
 if __name__ == '__main__':
