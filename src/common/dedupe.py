@@ -8,16 +8,14 @@ import shutil
 
 
 DUPLICATE_THRESHOLD = 1.5
-SIDE_MISALIGNMENT_RAD = 12.0 * math.pi / 180
+SIDE_MISALIGNMENT_RAD = 15.0 * math.pi / 180
 
 
 def deduplicate(input_path, output_path):
     """
     Removes duplicate vector pieces by only copying over unique pieces to the output directory
     """
-
-    # TODO:
-    # Use the piece location to make sure we're only removing pieces that are physically at the same location
+    # TODO: use the piece location to make sure we're only removing pieces that are physically at the same location
 
     # open up all the pieces
     i = 1
@@ -50,7 +48,7 @@ def deduplicate(input_path, output_path):
             if score < DUPLICATE_THRESHOLD:
                 print(f"[{i}]\t is duplicated by {j} \t Similarity: {score}")
                 dupe_side_lens[j] = sum([s.length for s in sides1])
-            elif score < DUPLICATE_THRESHOLD * 2.0:
+            elif score < 5.0 * DUPLICATE_THRESHOLD:
                 print(f"\t\t\t[{i}]\t is similar to {j} \t Similarity: {score}")
 
         if len(dupe_side_lens) == 1:
@@ -95,16 +93,14 @@ def _compare(sides0, sides1):
 
     min_cumulative_error = 1000
     for sides0 in permutations:
-        sides_aligned = True
-
         # first check to see if the pieces are in approximately the same orientation
         # we expect no rotation between duplicates
+        sides_aligned = True
         for i in range(4):
             angle_diff = util.compare_angles(sides0[i].angle, sides1[i].angle)
             if angle_diff > SIDE_MISALIGNMENT_RAD:
                 sides_aligned = False
                 break
-
         if not sides_aligned:
             continue
 

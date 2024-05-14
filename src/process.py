@@ -73,7 +73,6 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
         for d in photo_space_positions_list:
             photo_space_positions.update(d)
 
-    print(photo_space_positions)
     if start_at_step <= 2 and stop_before_step > 2:
         _vectorize(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
 
