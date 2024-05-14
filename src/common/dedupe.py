@@ -2,9 +2,11 @@ import os
 import json
 import numpy as np
 import math
+from glob import glob
+import shutil
 
 from common import util, sides
-import shutil
+
 
 
 DUPLICATE_THRESHOLD = 1.5
@@ -70,9 +72,15 @@ def deduplicate(input_path, output_path):
 
     # finally, copy all the uniques to the output directory
     for id in uniques:
+        # copy the json files
         for i in range(4):
             side_i = f'side_{id}_{i}.json'
             shutil.copyfile(os.path.join(input_path, side_i), os.path.join(output_path, side_i))
+        # copy the vector file as well
+        vector_filename = glob(f"{id}_*.svg", root_dir=input_path)[0] # Take the 0th element, there should be exactly 1
+        input_vector_file = os.path.join(input_path, vector_filename)
+        output_vector_file = os.path.join(output_path, vector_filename)
+        shutil.copyfile(input_vector_file, output_vector_file)
 
     return len(uniques)
 
