@@ -861,8 +861,8 @@ def remove_stragglers(pixels):
     if np.any(cracks):
         core_pixels[cracks] = 1
         removed = True
-    
-    # Remove peninsulas (the 3x3 center of a 5x5 slice, where only one border pixel is white (1) 
+
+    # Remove peninsulas (the 3x3 center of a 5x5 slice, where only one border pixel is white (1)
     # and the center pixel is white). The 3x3 center will all be set to 0
     #
     # 1  0  0  0  0    0  0  0  0  0    0  0  0  0  0
@@ -870,18 +870,18 @@ def remove_stragglers(pixels):
     # 0  1 (1) 0  0    0  1 (1) 1  0    0  0 (1) 0  0 ... etc
     # 0  0  0  0  0    0  1  0  0  0    0  1  0  0  0
     # 0  0  0  0  0    0  0  0  0  0    1  0  0  0  0
-    
+
     # pad the pixels with a 2px black border for image processing so our sliding window doesn't
     # run beyond the allowable index
     padded_pixels = np.pad(pixels, pad_width=2, mode='constant', constant_values=0)
     height, width = pixels.shape
 
     # Compute the number of border pixels set to 1. Use padded_pixels so we don't index outside of the array
-    borders = [padded_pixels[y:y+height, x:x+width] 
+    borders = [padded_pixels[y:y+height, x:x+width]
                for y in range(5) for x in range(5) if not ((x == 1 or x == 2 or x == 3) and (y == 1 or y == 2 or y == 3))]
     border_sum = sum(borders)
 
-    # Prepare an array of the same shape as pixels, where any peninsula pixels are represented by True. 
+    # Prepare an array of the same shape as pixels, where any peninsula pixels are represented by True.
     peninsulas = (pixels == 1) & (border_sum == 1)
 
     # Dilate that array to include the entire 3x3 center
