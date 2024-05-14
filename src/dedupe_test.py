@@ -8,6 +8,7 @@ import PIL
 from common import extract, util
 
 
+DUPLICATE_THRESHOLD = 6.0
 SEGMENT_DIR = '2_segmented'
 
 
@@ -34,7 +35,6 @@ def fill_islands(input_path, output_path):
 
 def _fill_islands(args):
     input_path, output_path = args
-    print(f"fill_islands({input_path}, {output_path})")
     pixels, width, height = util.load_bmp_as_binary_pixels(input_path)
     islands = _find_islands(pixels, ignore_islands_along_border=True, island_value=0)
 
@@ -126,7 +126,6 @@ def _thumbnail(args):
     img = img.convert('1')
     img = img.crop((0, 0, 140, 140))
     img.save(output_path)
-    print(f"Scaled down {input_path.split('/')[-1]} to {w}x{h}")
 
 
 def ssd(input_path):
@@ -147,7 +146,7 @@ def ssd(input_path):
             ssd_score = util.normalized_ssd(img, other_img)
             fi = fs[i].split('/')[-1].split('.')[0]
             fj = fs[j].split('/')[-1].split('.')[0]
-            if ssd_score < 4.0:
+            if ssd_score < DUPLICATE_THRESHOLD:
                 print(f"SSD between {fi} and {fj} is {ssd_score}")
                 dupes.add(j)
                 if fi not in debug:
