@@ -30,6 +30,9 @@ OPPOSITE = {
     TOP: BOTTOM, RIGHT: LEFT, BOTTOM: TOP, LEFT: RIGHT,
 }
 
+MAX_ITERATIONS_TO_FIND_BORDER = 1000
+MAX_ITERATIONS = 150000
+
 class Orientation(object):
     ZERO_POINTS_UP = 0
     ZERO_POINTS_RIGHT = 1
@@ -202,7 +205,7 @@ def build(connectivity=None, input_path=None, output_path=None):
     solution = None
     for i in range(0, 4):
         try:
-            solution = build_from_corner(ps, start_piece_id=corners[i])
+            solution = build_from_corner(ps, start_piece_id=corners[i], edge_length=edge_length)
         except Exception as e:
             print(f"Failed to build from corner {i}: {e}")
             continue
@@ -213,7 +216,7 @@ def build(connectivity=None, input_path=None, output_path=None):
         raise Exception("Failed to solve")
     return solution
 
-def build_from_corner(ps, start_piece_id):
+def build_from_corner(ps, start_piece_id, edge_length):
     print(f"\n===============================\nBuilding from corner {start_piece_id}...")
     start_piece_fits = ps[start_piece_id]
     start_orientation = _orient_start_corner_to_top_left(start_piece_fits)
@@ -238,6 +241,9 @@ def build_from_corner(ps, start_piece_id):
             print("\n" * 40)
             print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
             print(board)
+
+            if (iteration > MAX_ITERATIONS_TO_FIND_BORDER and longest < edge_length) or iteration > MAX_ITERATIONS:
+                raise Exception("Too many iterations, I think we chose the wrong corner")
 
         if board.placed_count == PUZZLE_WIDTH * PUZZLE_HEIGHT:
             print(f"Placed {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces in {iteration} iterations")

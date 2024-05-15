@@ -20,9 +20,10 @@ def deduplicate(input_path, output_path):
     # TODO: use the piece location to make sure we're only removing pieces that are physically at the same location
 
     # open up all the pieces
-    i = 1
     pieces = {}
-    while os.path.exists(os.path.join(input_path, f'side_{i}_0.json')):
+    for path in glob(f"{input_path}/side_*_0.json"):
+        i = int(path.split('/')[-1].split('_')[1])
+        print(path)
         piece = []
         for j in range(4):
             with open(os.path.join(input_path, f'side_{i}_{j}.json')) as f:
@@ -30,7 +31,6 @@ def deduplicate(input_path, output_path):
                 side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True, rotate=False)
                 piece.append(side)
         pieces[i] = piece
-        i += 1
 
     uniques = set()
     dupes = set()

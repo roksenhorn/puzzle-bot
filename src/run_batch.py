@@ -41,7 +41,7 @@ def main():
 
     process.batch_process_photos(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
     if args.stop_before_step is not None and args.stop_before_step >= 3:
-        solve.solve(path=args.path)
+        solve.solve(path=args.path, start_at=args.start_at_step)
 
     duration = time.time() - start_time
     print(f"\n\n{util.GREEN}### Ran in {round(duration, 2)} sec ###{util.WHITE}\n")

@@ -174,7 +174,11 @@ class Vector(object):
         else:
             return self
 
-    def save(self, output_path, metadata) -> None:
+    def save(self, output_path, metadata, only_save_edges=False) -> None:
+        if only_save_edges and not any([s.is_edge for s in self.sides]):
+            # it's sometimes nice to debug how the border of the puzzle looks
+            return
+
         # We generate an SVG of the piece for debugging
         d = SCALAR / 2.0  # scale the SVG down by this denominator
         colors = ['cc0000', '999900', '00aa99', '3300bb']

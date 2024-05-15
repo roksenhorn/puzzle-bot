@@ -11,12 +11,16 @@ from common import board, connect, dedupe, util
 from common.config import *
 
 
-def solve(path):
+def solve(path, start_at=3):
     """
     Given a path to processed piece data, finds a solution
     """
-    _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
-    connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+    if start_at <= 3:
+        _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
+    if start_at <= 4:
+        connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+    else:
+        connectivity = None
     puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
     _move_pieces_into_place(puzzle=puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
