@@ -4,9 +4,9 @@ import numpy as np
 import math
 from glob import glob
 import shutil
+from pathlib import Path
 
 from common import util, sides
-
 
 
 DUPLICATE_THRESHOLD = 1.5
@@ -21,12 +21,14 @@ def deduplicate(input_path, output_path):
 
     # open up all the pieces
     pieces = {}
-    for path in glob(f"{input_path}/side_*_0.json"):
-        i = int(path.split('/')[-1].split('_')[1])
+    input_path = Path(input_path)
+    for path in input_path.glob("side_*_0.json"):
+        i = int(path.parts[-1].split('_')[1])
         print(path)
         piece = []
         for j in range(4):
-            with open(os.path.join(input_path, f'side_{i}_{j}.json')) as f:
+            json_path = input_path.joinpath(f'side_{i}_{j}.json')
+            with open(json_path) as f:
                 data = json.load(f)
                 side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True, rotate=False)
                 piece.append(side)

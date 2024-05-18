@@ -24,7 +24,7 @@ BLACK_ON_BLUE = '\033[30;44m'
 BLACK_ON_RED = '\033[30;41m'
 BLACK_ON_GREEN = '\033[30;42m'
 
-EXPECTED_PHOTO_ORIENTATION = 6
+EXPECTED_PHOTO_ORIENTATION = 1 # Horizontal (normal)
 
 
 def load_bmp_as_binary_pixels(path):
