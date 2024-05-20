@@ -19,28 +19,35 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-path', help='Path to a directory of JPEGs')
     parser.add_argument('--working-dir', help='Where to process into')
+    parser.add_argument('--skip-processing', 
+                        type=bool,
+                        default=False,
+                        help="Solve puzzle only, pieces must already be processed",
+                        )
     args = parser.parse_args()
-    _prepare_new_run(args.working_dir)
 
-    # Open the batch.json file containing the robot position each photo was taken at
-    batch_info_file = posixpath.join(args.input_path, "batch.json")
-    with open(batch_info_file, "r") as jsonfile:
-        batch_info = json.load(jsonfile)
+    if (not args.skip_processing): 
+        _prepare_new_run(args.working_dir)
 
-    piece_id = 1
-    for f in os.listdir(args.input_path):
-        if f.endswith('.jpg') or f.endswith('.jpeg'):
-            print(f"{util.YELLOW}### Processing {f} ###{util.WHITE}")
-            # Obtain robot position where this photo was taken, from the json file
-            x,y,z = [d['position'] for d in batch_info['photos'] if d['file_name'] == f][0]
-            robot_state = dict(photo_at_motor_position=[x,y,z])
-            # Process photo
-            piece_id = process.process_photo(
-                photo_path=os.path.join(args.input_path, f), 
-                working_dir=args.working_dir, 
-                starting_piece_id=piece_id, 
-                robot_state=robot_state
-            )
+        # Open the batch.json file containing the robot position each photo was taken at
+        batch_info_file = posixpath.join(args.input_path, "batch.json")
+        with open(batch_info_file, "r") as jsonfile:
+            batch_info = json.load(jsonfile)
+
+        piece_id = 1
+        for f in os.listdir(args.input_path):
+            if f.endswith('.jpg') or f.endswith('.jpeg'):
+                print(f"{util.YELLOW}### Processing {f} ###{util.WHITE}")
+                # Obtain robot position where this photo was taken, from the json file
+                x,y,z = [d['position'] for d in batch_info['photos'] if d['file_name'] == f][0]
+                robot_state = dict(photo_at_motor_position=[x,y,z])
+                # Process photo
+                piece_id = process.process_photo(
+                    photo_path=os.path.join(args.input_path, f), 
+                    working_dir=args.working_dir, 
+                    starting_piece_id=piece_id, 
+                    robot_state=robot_state
+                )
 
     print("Solving")
     solve.solve(path=args.working_dir)

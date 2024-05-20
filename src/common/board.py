@@ -203,6 +203,17 @@ def build(connectivity=None, input_path=None, output_path=None):
 
     success = False
     solution = None
+
+    # For a given puzzle, put the corners in a predictable order using the 
+    # arbitrary but repeatible heuristic of how many adjacent pieces they would fit.
+    # This ensures the solution will appear in the same orientation, for any given puzzle.
+    corners = sorted(
+        corners, 
+        key=lambda c: sum([len(fits) for fits in ps[c]]), 
+        reverse=True # Sort in Descending order
+    )
+
+
     for i in range(0, 4):
         try:
             solution = build_from_corner(ps, start_piece_id=corners[i], edge_length=edge_length)
