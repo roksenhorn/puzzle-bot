@@ -31,7 +31,7 @@ OPPOSITE = {
 }
 
 MAX_ITERATIONS_TO_FIND_BORDER = 1000
-MAX_ITERATIONS = 150000
+MAX_ITERATIONS = 150000000
 
 class Orientation(object):
     ZERO_POINTS_UP = 0
@@ -239,7 +239,7 @@ def build_from_corner(ps, start_piece_id, edge_length):
         board, start_piece_id, start_orientation, x, y, direction = data
         if iteration % 100 == 0:
             print("\n" * 40)
-            print(f"Iteration {iteration} with cost {priority}, longest: {longest}")
+            print(f"Iteration {iteration} with length {board.placed_count}, cost {priority}, longest: {longest}")
             print(board)
 
             if (iteration > MAX_ITERATIONS_TO_FIND_BORDER and longest < edge_length) or iteration > MAX_ITERATIONS:

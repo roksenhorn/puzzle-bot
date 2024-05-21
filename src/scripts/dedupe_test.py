@@ -5,7 +5,7 @@ import multiprocessing
 import re
 import PIL
 
-from common import extract, util
+from common import util
 
 
 DUPLICATE_THRESHOLD = 8.0
