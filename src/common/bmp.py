@@ -34,7 +34,7 @@ def segment(input_photo_filename, output_path=None, width=BMP_WIDTH, threshold=S
     if output_path:
         _save(output_path, bw_pixels, width, height)
 
-    return scale_factor
+    return width, height, scale_factor
 
 
 def _save(output_path, bw_pixels, width, height):

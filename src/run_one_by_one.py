@@ -19,14 +19,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-path', help='Path to a directory of JPEGs')
     parser.add_argument('--working-dir', help='Where to process into')
-    parser.add_argument('--skip-processing', 
+    parser.add_argument('--skip-processing',
                         type=bool,
                         default=False,
                         help="Solve puzzle only, pieces must already be processed",
                         )
     args = parser.parse_args()
 
-    if (not args.skip_processing): 
+    if (not args.skip_processing):
         _prepare_new_run(args.working_dir)
 
         # Open the batch.json file containing the robot position each photo was taken at
@@ -43,9 +43,9 @@ def main():
                 robot_state = dict(photo_at_motor_position=[x,y,z])
                 # Process photo
                 piece_id = process.process_photo(
-                    photo_path=os.path.join(args.input_path, f), 
-                    working_dir=args.working_dir, 
-                    starting_piece_id=piece_id, 
+                    photo_path=os.path.join(args.input_path, f),
+                    working_dir=args.working_dir,
+                    starting_piece_id=piece_id,
                     robot_state=robot_state
                 )
 

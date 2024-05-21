@@ -25,8 +25,12 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
 
     # 1 - segment into a binary BMP
     bmp_path = os.path.join(working_dir, PHOTO_BMP_DIR, f'{os.path.basename(photo_path).split(".")[0]}.bmp')
-    scale_factor = bmp.photo_to_bmp(args=(photo_path, bmp_path))
+    width, height, scale_factor = bmp.photo_to_bmp(args=(photo_path, bmp_path))
     metadata['scale_factor'] = scale_factor
+    metadata['bmp_width'] = width
+    metadata['bmp_height'] = height
+
+    print(width, height, scale_factor)
 
     # 2 - extract pieces from the binary BMP
     extract_path = os.path.join(working_dir, SEGMENT_DIR)
@@ -60,11 +64,13 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
     metadata = { "robot_state": {} }
 
     if start_at_step <= 0 and stop_before_step > 0:
-        scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
+        width, height, scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
     else:
-        scale_factor = 1.0
+        width, height, scale_factor = 1, 1, 1.0
 
     metadata['scale_factor'] = scale_factor
+    metadata['bmp_width'] = width
+    metadata['bmp_height'] = height
 
     photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:

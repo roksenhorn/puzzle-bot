@@ -17,14 +17,12 @@ def deduplicate(input_path, output_path):
     """
     Removes duplicate vector pieces by only copying over unique pieces to the output directory
     """
-    # TODO: use the piece location to make sure we're only removing pieces that are physically at the same location
-
     # open up all the pieces
     pieces = {}
+    piece_photo_locations = {}
     input_path = Path(input_path)
     for path in input_path.glob("side_*_0.json"):
         i = int(path.parts[-1].split('_')[1])
-        print(path)
         piece = []
         for j in range(4):
             json_path = input_path.joinpath(f'side_{i}_{j}.json')
@@ -32,6 +30,16 @@ def deduplicate(input_path, output_path):
                 data = json.load(f)
                 side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True, rotate=False)
                 piece.append(side)
+
+                # we'll also want to know where in the photo frame this piece was
+                scale_factor = data['scale_factor']
+                photo_space_incenter = data['photo_space_incenter']
+                bmp_space_incenter = (photo_space_incenter[0] * scale_factor, photo_space_incenter[1] * scale_factor)
+                piece_photo_locations[i] = {
+                    'bmp_width': data['bmp_width'],
+                    'bmp_height': data['bmp_height'],
+                    'bmp_space_incenter': bmp_space_incenter,
+                }
         pieces[i] = piece
 
     uniques = set()
@@ -42,8 +50,9 @@ def deduplicate(input_path, output_path):
         if i in dupes:
             continue
 
-        dupe_side_lens = {}
-        dupe_side_lens[i] = sum([s.length for s in sides0])
+        dupes_of_i = {}
+        # dupe_side_lens = {}
+        # dupe_side_lens[i] = sum([s.length for s in sides0])
         for j, sides1 in pieces.items():
             if i == j:
                 continue
@@ -51,22 +60,21 @@ def deduplicate(input_path, output_path):
             score = _compare(sides0, sides1)
             if score < DUPLICATE_THRESHOLD:
                 print(f"[{i}]\t is duplicated by {j} \t Similarity: {score}")
-                dupe_side_lens[j] = sum([s.length for s in sides1])
+                dupes_of_i[j] = piece_photo_locations[j]
             elif score < 5.0 * DUPLICATE_THRESHOLD:
                 print(f"\t\t\t[{i}]\t is similar to {j} \t Similarity: {score}")
 
-        if len(dupe_side_lens) == 1:
+        if len(dupes_of_i) == 0:
             # if this piece was truly unique, keep it
             uniques.add(i)
         else:
-            # if this piece has duplciates, of all the duplicates, find the one with the cleanest vectorization
-            sorted_side_lens = sorted(dupe_side_lens.items(), key=lambda x: (x[1], x[0]))
-            best_dupe = sorted_side_lens[0][0]
-            uniques.add(best_dupe)
-            # print(f"\t Keeping {best_dupe} with len {sorted_side_lens[0][1]}")
-            for j in sorted_side_lens[1:]:
-                dupes.add(j[0])
-                # print(f"\t Removing {j[0]} with len {j[1]}")
+            # if this piece has duplciates, of all the duplicates, find the "best" one
+            dupes_of_i[i] = piece_photo_locations[i]
+            best_dupe_id = _pick_best_dupe(dupes_of_i)
+            uniques.add(best_dupe_id)
+            for j, _ in dupes_of_i.items():
+                if j != best_dupe_id:
+                    dupes.add(j)
 
     print(f"Started with {len(pieces)}; found {len(dupes)} duplicate pieces; resulting in {len(uniques)} unique pieces.")
 
@@ -83,6 +91,29 @@ def deduplicate(input_path, output_path):
         shutil.copyfile(input_vector_file, output_vector_file)
 
     return len(uniques)
+
+
+def _pick_best_dupe(pieces):
+    """
+    Given a dict of piece_ids :=> piece metadata dicts, pick the best one to keep
+    by finding the one that was closest to the center of the photograph
+    We have highest telecentricity and image quality in the center of the frame
+    """
+    # grab any element to get the center coordinate of any photo (half the width and height of the photo)
+    any_id = next(iter(pieces))
+    any_metadata = pieces[any_id]
+    center = (any_metadata['bmp_width']/2, any_metadata['bmp_height']/2)
+
+    # find which ID is closest to the center of the photo
+    best_id = None
+    best_score = 1000000
+    for id, metadata in pieces.items():
+        piece_center = metadata['bmp_space_incenter']
+        score = util.distance(center, piece_center)
+        if score < best_score:
+            best_id = id
+            best_score = score
+    return best_id
 
 
 def _compare(sides0, sides1):
