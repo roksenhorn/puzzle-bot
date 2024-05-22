@@ -156,6 +156,7 @@ class Vector(object):
         try:
             self.find_four_corners()
             self.extract_four_sides()
+            self.enhance_corners()
         except Exception as e:
             self.render()
             print(f"Error while processing id {self.id} in file {self.filename}:")
@@ -192,7 +193,19 @@ class Vector(object):
         # draw in a small circle for each corner (the first and last vertex for each side)
         for i, side in enumerate(self.sides):
             v = side.vertices[0]
-            svg += f'<circle cx="{v[0] / d}" cy="{v[1] / d}" r="{1.0}" style="fill:#000000; stroke-width:0" />'
+            svg += f'<circle cx="{v[0] / d}" cy="{v[1] / d}" r="{2.0}" style="fill:none; stroke:#000000; stroke-width:0.25" />'
+        for i, corner in enumerate(self.enhanced_corners):
+            svg += f'<circle cx="{corner[0] / d}" cy="{corner[1] / d}" r="{2.0}" style="fill:none; stroke:#44ffcc; stroke-width:0.25" />'
+        for (slice_a, slice_b) in self.slices:
+            pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in slice_a])
+            pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in slice_b])
+            svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#001100; stroke-width:{1.0}" />'
+            svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#000011; stroke-width:{1.0}" />'
+        for (trendline_a, trendline_b) in self.trendlines:
+            pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_a])
+            pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_b])
+            svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#ffaa00; stroke-width:0.4" />'
+            svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#aaff00; stroke-width:0.4" />'
         svg += f'<circle cx="{self.centroid[0] / d}" cy="{self.centroid[1] / d}" r="{1.0}" style="fill:#444444; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
@@ -332,7 +345,12 @@ class Vector(object):
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(self.vertices)):
             debug = self.vertices[i][1] in (2260, 1250)
-            candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
+            try:
+                candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
+            except Exception as e:
+                print(f"Error while computing curve score for piece {self.id}: {e}")
+            curve_score = 0.0
+
             if not candidate or candidate.score() > 3.0:
                 if debug:
                     print(f">>>>>> Skipping; score too high: {candidate.score() if candidate else 0.0}")
@@ -490,9 +508,9 @@ class Vector(object):
         all_pair_pairs = list(itertools.combinations(all_pair_scores, 2))
         all_pair_pair_scores = sorted([_score_4_candidates(pair0, pair1) for (pair0, pair1) in all_pair_pairs], key=lambda c: c[4])
 
-        self.selected_candidates = all_pair_pair_scores[0][0:4]
-        self.corners = [c.v for c in self.selected_candidates]
-        self.corner_indices = [c.i for c in self.selected_candidates]
+        selected_candidates = all_pair_pair_scores[0][0:4]
+        self.corners = [c.v for c in selected_candidates]
+        self.corner_indices = [c.i for c in selected_candidates]
 
     def extract_four_sides(self) -> None:
         """
@@ -510,7 +528,7 @@ class Vector(object):
             vertices = util.slice(self.vertices, c_i, c_j)
 
             # do a bit of simplification
-            vertices = util.ramer_douglas_peucker(vertices, epsilon=0.05)
+            # vertices = util.ramer_douglas_peucker(vertices, epsilon=0.05)
             self.merge_close_points(vertices, threshold=MERGE_IF_CLOSER_THAN_PX)
 
             # make sure to include the true endpoints
@@ -560,6 +578,66 @@ class Vector(object):
         elif edge_count == 2:
             if (self.sides[0].is_edge and self.sides[2].is_edge) or (self.sides[1].is_edge and self.sides[3].is_edge):
                 raise Exception(f"{self.id}: A piece cannot be a part of two edges that are parallel!")
+
+    def enhance_corners(self):
+        """
+        Nudges the corners to where a physical corner would actually be at,
+        because pieces tend to get bumped and dinged and corners are most susceptible
+        to bending
+        """
+        # Go through each pair of sides and improve their intersection point
+        self.enhanced_corners = []
+        self.slices = []
+        self.trendlines = []
+        for i in range(4):
+            j = (i - 1) % 4
+            side_i = self.sides[i]
+            side_j = self.sides[j]
+            corner = self.corners[i]
+
+            # we'll walk back a bit from the corner to find the angle of the side
+            #
+            #  --------*  <- corner
+            #  ^     ^
+            #  start end
+            #
+            # we don't go all the way up to the corner because the last little bit might be bent
+            SLICE_MIN_DIST_FROM_CORNER = int(round(1.5 * SCALAR))
+            SLICE_MAX_DIST_FROM_CORNER = int(round(6.5 * SCALAR))
+
+            # for side_i, we take the tail end of the side
+            side_i_slice = []
+            for v in side_i.vertices:
+                if util.distance(v, corner) >= SLICE_MIN_DIST_FROM_CORNER and \
+                   util.distance(v, corner) <= SLICE_MAX_DIST_FROM_CORNER:
+                    side_i_slice.append(v)
+
+            # and for side_j, we take the head end of the side
+            side_j_slice = []
+            for v in side_j.vertices:
+                if util.distance(v, corner) >= SLICE_MIN_DIST_FROM_CORNER and \
+                   util.distance(v, corner) <= SLICE_MAX_DIST_FROM_CORNER:
+                    side_j_slice.append(v)
+
+            print(side_i_slice)
+            print(side_j_slice)
+
+            # find the lines that best approximates those points
+            angle_i = util.trendline(side_i_slice)
+            angle_j = util.trendline(side_j_slice)
+            line_i = util.line_from_angle_and_point(angle=angle_i, point=side_i_slice[0], length=100)
+            line_j = util.line_from_angle_and_point(angle=angle_j, point=side_j_slice[-1], length=100)
+
+            # and the intersection of these lines is our new corner
+            intersection = util.intersection(line_i, line_j)
+            self.enhanced_corners.append(intersection)
+            self.slices.append([side_i_slice, side_j_slice])
+            self.trendlines.append([line_i, line_j])
+
+        # todo - actually update things
+        # self.corners = [c.v for c in selected_candidates]
+        # self.corner_indices = [c.i for c in selected_candidates]
+        # self.sides[0].vertices[0] = self.corners[0] ???
 
     def render(self) -> None:
         SIDE_COLORS = [util.RED, util.GREEN, util.PURPLE, util.CYAN]

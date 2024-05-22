@@ -273,6 +273,16 @@ def intersection(line1, line2):
         return int(round(xi)), int(round(yi))
 
 
+def line_from_angle_and_point(angle, point, length):
+    """
+    Extrapolates a line from a point at a given angle.
+    """
+    x, y = point
+    x2 = x + length * math.cos(angle)
+    y2 = y + length * math.sin(angle)
+    return (x, y), (int(round(x2)), int(round(y2)))
+
+
 def rotate_polyline(polyline, around_point, angle):
     """
     Rotates a polyline around a point by a given angle.
@@ -642,6 +652,21 @@ def colinearity(from_point, to_points, debug=False) -> Tuple[float, float]:
         print(f"avg: {round(avg * 180/math.pi)}")
         print(f"deltas: {[(angle - avg) ** 2 for angle in angles]} \t ==> stdev: {std_dev}")
     return avg, std_dev
+
+
+def trendline(points):
+    """
+    Given a list of points that are roughly colinear
+    Returns the line that best fits them
+    Returned as an angle vectoring from the first point
+    """
+    print(f"Finding trendline for {points}")
+    x = np.array([p[0] for p in points])
+    y = np.array([p[1] for p in points])
+    A = np.vstack([x, np.ones(len(x))]).T
+    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+    angle = math.atan(m)
+    return angle
 
 
 def sublist_exists(lst, sub_lst):
