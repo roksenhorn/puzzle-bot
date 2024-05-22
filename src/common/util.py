@@ -660,7 +660,6 @@ def trendline(points):
     Returns the line that best fits them
     Returned as an angle vectoring from the first point
     """
-    print(f"Finding trendline for {points}")
     x = np.array([p[0] for p in points])
     y = np.array([p[1] for p in points])
     A = np.vstack([x, np.ones(len(x))]).T

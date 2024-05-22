@@ -191,21 +191,22 @@ class Vector(object):
             dash = 'stroke-dasharray="6,3"' if side.is_edge else ''
             svg += f'<polyline points="{pts}" style="fill:none; stroke:#{colors[i]}; stroke-width:{stroke_width}" {dash} />'
         # draw in a small circle for each corner (the first and last vertex for each side)
-        for i, side in enumerate(self.sides):
-            v = side.vertices[0]
-            svg += f'<circle cx="{v[0] / d}" cy="{v[1] / d}" r="{2.0}" style="fill:none; stroke:#000000; stroke-width:0.25" />'
-        for i, corner in enumerate(self.enhanced_corners):
-            svg += f'<circle cx="{corner[0] / d}" cy="{corner[1] / d}" r="{2.0}" style="fill:none; stroke:#44ffcc; stroke-width:0.25" />'
-        for (slice_a, slice_b) in self.slices:
-            pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in slice_a])
-            pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in slice_b])
-            svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#001100; stroke-width:{1.0}" />'
-            svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#000011; stroke-width:{1.0}" />'
-        for (trendline_a, trendline_b) in self.trendlines:
-            pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_a])
-            pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_b])
-            svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#ffaa00; stroke-width:0.4" />'
-            svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#aaff00; stroke-width:0.4" />'
+        for corner in self.corners:
+            svg += f'<circle cx="{corner[0] / d}" cy="{corner[1] / d}" r="{2.0}" style="fill:none; stroke:#000000aa; stroke-width:0.25" />'
+        # if we've enhanced our corners, show the debug output
+        if hasattr(self, 'old_corners'):
+            for corner in self.old_corners:
+                svg += f'<circle cx="{corner[0] / d}" cy="{corner[1] / d}" r="{2.0}" style="fill:none; stroke:#ff3366aa; stroke-width:0.25" />'
+            for (slice_a, slice_b) in self.debug_slices:
+                pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in slice_a])
+                pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in slice_b])
+                svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#001100; stroke-width:{1.0}" />'
+                svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#000011; stroke-width:{1.0}" />'
+            for (trendline_a, trendline_b) in self.debug_trendlines:
+                pts_a = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_a])
+                pts_b = ' '.join([','.join([str(e / d) for e in v]) for v in trendline_b])
+                svg += f'<polyline points="{pts_a}" style="fill:none; stroke:#ffaa00; stroke-width:0.4" />'
+                svg += f'<polyline points="{pts_b}" style="fill:none; stroke:#aaff00; stroke-width:0.4" />'
         svg += f'<circle cx="{self.centroid[0] / d}" cy="{self.centroid[1] / d}" r="{1.0}" style="fill:#444444; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
@@ -585,15 +586,18 @@ class Vector(object):
         because pieces tend to get bumped and dinged and corners are most susceptible
         to bending
         """
-        # Go through each pair of sides and improve their intersection point
         self.enhanced_corners = []
-        self.slices = []
-        self.trendlines = []
+        self.debug_slices = []
+        self.debug_trendlines = []
+        self.old_corners = self.corners.copy()
+        self.corner_indices = None  # this field is no longer valid nor needed
+
+        # Go through each pair of sides and improve their intersection point
         for i in range(4):
             j = (i - 1) % 4
             side_i = self.sides[i]
             side_j = self.sides[j]
-            corner = self.corners[i]
+            corner = self.old_corners[i]
 
             # we'll walk back a bit from the corner to find the angle of the side
             #
@@ -619,9 +623,6 @@ class Vector(object):
                    util.distance(v, corner) <= SLICE_MAX_DIST_FROM_CORNER:
                     side_j_slice.append(v)
 
-            print(side_i_slice)
-            print(side_j_slice)
-
             # find the lines that best approximates those points
             angle_i = util.trendline(side_i_slice)
             angle_j = util.trendline(side_j_slice)
@@ -629,15 +630,29 @@ class Vector(object):
             line_j = util.line_from_angle_and_point(angle=angle_j, point=side_j_slice[-1], length=100)
 
             # and the intersection of these lines is our new corner
-            intersection = util.intersection(line_i, line_j)
-            self.enhanced_corners.append(intersection)
-            self.slices.append([side_i_slice, side_j_slice])
-            self.trendlines.append([line_i, line_j])
+            enhanced_corner = util.intersection(line_i, line_j)
+            self.corners[i] = enhanced_corner
 
-        # todo - actually update things
-        # self.corners = [c.v for c in selected_candidates]
-        # self.corner_indices = [c.i for c in selected_candidates]
-        # self.sides[0].vertices[0] = self.corners[0] ???
+            # save off debug data for visualization
+            self.debug_slices.append([side_i_slice, side_j_slice])
+            self.debug_trendlines.append([line_i, line_j])
+
+            # finally, we have to inject these new corners into each sides' vertices
+            # we don't want to back-track or jump, so we remove nearby vertices
+            for i in range(len(side_j.vertices) - 1, 0, -1):
+                # chew off vertices from the tail of j that are close to the corner
+                if util.distance(side_j.vertices[i], corner) <= SLICE_MIN_DIST_FROM_CORNER:
+                    side_j.vertices.pop(i)
+                else:
+                    break
+            while len(side_i.vertices) > 0:
+                # chew off vertices from the head of i that are close to the corner
+                if util.distance(side_i.vertices[0], corner) <= SLICE_MIN_DIST_FROM_CORNER:
+                    side_i.vertices.pop(0)
+                else:
+                    break
+            side_i.vertices.insert(0, enhanced_corner)
+            side_j.vertices.append(enhanced_corner)
 
     def render(self) -> None:
         SIDE_COLORS = [util.RED, util.GREEN, util.PURPLE, util.CYAN]
