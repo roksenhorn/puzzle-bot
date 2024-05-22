@@ -662,11 +662,17 @@ def trendline(points):
     """
     x = np.array([p[0] for p in points])
     y = np.array([p[1] for p in points])
+    if x.ndim != 1 or y.ndim != 1:
+        raise ValueError("Input points must be a list of 2D points.")
+
+    # Creating the design matrix for least squares
+    # then perform the least squares fit
     A = np.vstack([x, np.ones(len(x))]).T
     m, c = np.linalg.lstsq(A, y, rcond=None)[0]
-    angle = math.atan(m)
-    return angle
 
+    # Calculate the angle
+    angle = math.atan2(y[-1] - y[0], x[-1] - x[0])
+    return angle % (2 * math.pi)
 
 def sublist_exists(lst, sub_lst):
     """

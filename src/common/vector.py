@@ -171,7 +171,11 @@ class Vector(object):
         metadata["photo_space_incenter"] = photo_space_incenter
 
         if output_path:
-            self.save(output_path, metadata)
+            try:
+                self.save(output_path, metadata)
+            except Exception as e:
+                print(f"Error while saving id {self.id} in file {self.filename}:")
+                raise e
         else:
             return self
 
@@ -407,7 +411,7 @@ class Vector(object):
             Given a pair of candidate corners, we produce a unitless score for how good they are
             Lower is better
             """
-            debug = (c0.v[1] == 630)
+            debug = (c0.v[1] == 6300)
 
             # first, start with the score of each individual corner
             score = 1.2 * (c0.score() + c1.score())
@@ -529,7 +533,7 @@ class Vector(object):
             vertices = util.slice(self.vertices, c_i, c_j)
 
             # do a bit of simplification
-            # vertices = util.ramer_douglas_peucker(vertices, epsilon=0.05)
+            # vertices = util.ramer_douglas_peucker(vertices, epsilon=0.05)  # I turned this off because we lose density of vertices that the corner-enhancing step relies on
             self.merge_close_points(vertices, threshold=MERGE_IF_CLOSER_THAN_PX)
 
             # make sure to include the true endpoints
@@ -549,7 +553,6 @@ class Vector(object):
             # - a gentle squiggle (like a sine wave)
             area = util.normalized_area_between_corners(vertices)
             is_edge = bool(area < 2.2)  # ICC changed from 1.9 to 2.2 # worst edge I saw was 1.5, best non-edge I saw was 3.3
-
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
 
@@ -593,21 +596,20 @@ class Vector(object):
         self.corner_indices = None  # this field is no longer valid nor needed
 
         # Go through each pair of sides and improve their intersection point
+        # we'll walk back a bit from the corner to find the angle of the side
+        #
+        #  ---------------*  <- corner
+        #     ^       ^   |
+        #    MAX     MIN  |
+        #
+        # we don't go all the way up to the corner because the last little bit might be bent
+        SLICE_MIN_DIST_FROM_CORNER = int(round(1.5 * SCALAR))
+        SLICE_MAX_DIST_FROM_CORNER = int(round(6.5 * SCALAR))
         for i in range(4):
             j = (i - 1) % 4
             side_i = self.sides[i]
             side_j = self.sides[j]
             corner = self.old_corners[i]
-
-            # we'll walk back a bit from the corner to find the angle of the side
-            #
-            #  --------*  <- corner
-            #  ^     ^
-            #  start end
-            #
-            # we don't go all the way up to the corner because the last little bit might be bent
-            SLICE_MIN_DIST_FROM_CORNER = int(round(1.5 * SCALAR))
-            SLICE_MAX_DIST_FROM_CORNER = int(round(6.5 * SCALAR))
 
             # for side_i, we take the tail end of the side
             side_i_slice = []
@@ -631,6 +633,10 @@ class Vector(object):
 
             # and the intersection of these lines is our new corner
             enhanced_corner = util.intersection(line_i, line_j)
+            if not enhanced_corner:
+                print(f"Angle i = {angle_i}\nAngle j = {angle_j}")
+                print(f"Line i = {line_i}\nLine j = {line_j}")
+                raise Exception(f"[Piece {self.id}] Could not find intersection of lines {line_i} and {line_j}")
             self.corners[i] = enhanced_corner
 
             # save off debug data for visualization

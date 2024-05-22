@@ -44,8 +44,14 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
         vector_path = os.path.join(working_dir, VECTOR_DIR)
         args.append((f, piece_id, vector_path, piece_metadata, photo_space_position, scale_factor, False))
         piece_id += 1
-    with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-        pool.map(vector.load_and_vectorize, args)
+
+    SERIALIZE = True  # flip this for improved debugability
+    if SERIALIZE:
+        for arg in args:
+            vector.load_and_vectorize(arg)
+    else:
+        with multiprocessing.Pool(processes=os.cpu_count()) as pool:
+            pool.map(vector.load_and_vectorize, args)
 
     return piece_id
 
@@ -64,6 +70,7 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
     if start_at_step <= 0 and stop_before_step > 0:
         width, height, scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
     else:
+        # mock when skipping step 0
         width, height, scale_factor = 1, 1, 1.0
 
     metadata['scale_factor'] = scale_factor
@@ -76,6 +83,10 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
         photo_space_positions_list = [o[1] for o in output]
         for d in photo_space_positions_list:
             photo_space_positions.update(d)
+    else:
+        # mock when skipping step 1
+        for f in os.listdir(os.path.join(path, SEGMENT_DIR)):
+            photo_space_positions[os.path.join(path, SEGMENT_DIR, f)] = (0, 0)
 
     if start_at_step <= 2 and stop_before_step > 2:
         _vectorize(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
@@ -149,9 +160,10 @@ def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_f
         piece_metadata["photo_space_origin"] = photo_space_position
         args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
-        i += 1
         if id is not None:
             break
+        else:
+            i += 1
 
     if serialize:
         for arg in args:
