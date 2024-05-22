@@ -350,6 +350,7 @@ class Vector(object):
         # if it is roughly 90º and pointed toward the center, it's a corner
         for i in range(len(self.vertices)):
             debug = self.vertices[i][1] in (2260, 1250)
+            candidate = None
             try:
                 candidate = Candidate.from_vertex(self.vertices, i, self.centroid, debug=debug)
             except Exception as e:

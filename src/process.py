@@ -45,7 +45,7 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
         args.append((f, piece_id, vector_path, piece_metadata, photo_space_position, scale_factor, False))
         piece_id += 1
 
-    SERIALIZE = True  # flip this for improved debugability
+    SERIALIZE = False  # flip this for improved debugability
     if SERIALIZE:
         for arg in args:
             vector.load_and_vectorize(arg)
