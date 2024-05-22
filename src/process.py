@@ -30,8 +30,6 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
     metadata['bmp_width'] = width
     metadata['bmp_height'] = height
 
-    print(width, height, scale_factor)
-
     # 2 - extract pieces from the binary BMP
     extract_path = os.path.join(working_dir, SEGMENT_DIR)
     extracted_paths, extracted_photo_space_positions = extract.extract_pieces(args=(bmp_path, extract_path, scale_factor))

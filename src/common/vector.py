@@ -27,7 +27,7 @@ EDGE_WIDTH_MIN_RATIO = 0.4
 
 # scale pixel offsets depending on how big the BMPs are
 # 1.0 is tuned for around 100 pixels wide
-SCALAR = 5.0
+SCALAR = 9.45
 
 
 def load_and_vectorize(args):

@@ -75,7 +75,7 @@ def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
                 print(f"Error resizing {path}")
                 raise e
         else:
-            scale_factor = None
+            scale_factor = 1.0
 
         if crop:
             w, h = img.size

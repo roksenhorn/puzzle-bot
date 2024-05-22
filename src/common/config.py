@@ -3,7 +3,7 @@ Common configuration for the puzzle bot
 """
 
 # Paramaters for photo segmentation
-BMP_WIDTH = 2100  # scale the BMP to this wide
+BMP_WIDTH = None  # 2100  # scale the BMP to this wide or None to turn off scaling
 MIN_PIECE_AREA = 200*200
 SEG_THRESH = 135  # for white pieces, raise this to cut tighter into the border (ICC changed from 190 to 180 as an experiment)
 
