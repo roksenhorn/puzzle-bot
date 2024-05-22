@@ -50,6 +50,9 @@ def _clean_and_save_piece(pixels, output_path, origin, scale_factor):
     # clean up any thin strands of pixels like hairs or dust
     util.remove_stragglers(pixels)
 
+    # remove any tiny islands that are probably noise
+    util.remove_tiny_islands(pixels)
+
     # trim the piece to the smallest bounding box
     rows = np.any(pixels, axis=1)
     cols = np.any(pixels, axis=0)

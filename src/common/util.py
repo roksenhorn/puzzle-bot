@@ -701,7 +701,7 @@ def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIE
     :param grid: a 2D array of 0s and 1s
     :param callback: a function that will be called with each island found
     :param ignore_islands_along_border: if True, islands that touch the border of the grid will be ignored
-    :param island_value: the value that represents an island in the grid (1 or 0)
+    :param 1: the value that represents an island in the grid (1 or 0)
 
     Returns either a list of tuples: each island paired with its origin
     """
@@ -930,3 +930,23 @@ def remove_stragglers(pixels):
         return remove_stragglers(pixels)
 
     return False
+
+
+def remove_tiny_islands(pixels):
+    visited = set()
+    for i in range(len(pixels)):
+        for j in range(len(pixels[i])):
+            if pixels[i][j] == 1 and (i, j) not in visited:
+                island = set()
+                queue = [(i, j)]
+                while queue:
+                    x, y = queue.pop(0)
+                    if (x, y) not in visited:
+                        visited.add((x, y))
+                        island.add((y, x))
+                        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                            if 0 <= x + dx < len(pixels) and 0 <= y + dy < len(pixels[0]) and pixels[x + dx][y + dy] == 1:
+                                queue.append((x + dx, y + dy))
+                if len(island) < 100:
+                    for x, y in island:
+                        pixels[y][x] = 0

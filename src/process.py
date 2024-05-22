@@ -47,6 +47,7 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
 
     SERIALIZE = False  # flip this for improved debugability
     if SERIALIZE:
+        print("!!!!! RUNNING IN SERIAL MODE - Only do this if you're debugging. Flip back to parallel mode for 10x speedup !!!!!")
         for arg in args:
             vector.load_and_vectorize(arg)
     else:

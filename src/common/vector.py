@@ -33,7 +33,11 @@ SCALAR = 9.45
 def load_and_vectorize(args):
     filename, id, output_path, metadata, photo_space_position, scale_factor, render = args
     v = Vector.from_file(filename, id)
-    return v.process(output_path, metadata, photo_space_position, scale_factor, render)
+    try:
+        return v.process(output_path, metadata, photo_space_position, scale_factor, render)
+    except Exception as e:
+        print(f"Error while processing id {id} in file {filename}:")
+        raise e
 
 
 class Candidate(object):
