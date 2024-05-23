@@ -557,7 +557,7 @@ class Vector(object):
             # - a gentle sloping curve (like the shape of a parenthesis)
             # - a gentle squiggle (like a sine wave)
             area = util.normalized_area_between_corners(vertices)
-            is_edge = bool(area < 2.2)  # ICC changed from 1.9 to 2.2 # worst edge I saw was 1.5, best non-edge I saw was 3.3
+            is_edge = bool(area < 0.75 * SCALAR)
             side = sides.Side(piece_id=self.id, side_id=None, vertices=vertices, piece_center=self.centroid, is_edge=is_edge)
             self.sides.append(side)
 

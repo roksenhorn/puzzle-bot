@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from common import util, sides
+from common.config import *
 
 
 DUPLICATE_THRESHOLD = 1.5
@@ -18,6 +19,7 @@ def deduplicate(batch_data_path, input_path, output_path):
     Removes duplicate vector pieces by only copying over unique pieces to the output directory
     """
     # open up all the pieces
+    print(f"Loading piece data from {input_path}...")
     pieces = {}
     piece_photo_locations = {}
     input_path = Path(input_path)
@@ -49,7 +51,7 @@ def deduplicate(batch_data_path, input_path, output_path):
         batch_data_d = json.load(f)["photos"]
     batch_data = {}
     for d in batch_data_d:
-        batch_data[d["file_name"]] = d["positions"]
+        batch_data[d["file_name"]] = d["position"]
 
     uniques = set()
     dupes = set()
@@ -72,15 +74,15 @@ def deduplicate(batch_data_path, input_path, output_path):
             piece_j_gripper_position = batch_data[piece_j_photo_filename]
             gripper_distance = util.distance(piece_i_gripper_position, piece_j_gripper_position)
             pixel_distance = gripper_distance / APPROX_ROBOT_COUNTS_PER_PIXEL
-            if pixel_distance > 5000:
-                print(f"{i} -> {j} are {pixel_distance} px apart, no change of duplicate")
+            if pixel_distance > 6000:
                 continue
 
+            # compare geometries
             score = _compare(sides0, sides1)
             if score < DUPLICATE_THRESHOLD:
                 print(f"[{i}]\t is duplicated by {j} \t Similarity: {score}")
                 dupes_of_i[j] = piece_photo_locations[j]
-            elif score < 5.0 * DUPLICATE_THRESHOLD:
+            elif score < 3.0 * DUPLICATE_THRESHOLD:
                 print(f"\t\t\t[{i}]\t is similar to {j} \t Similarity: {score}")
 
         if len(dupes_of_i) == 0:

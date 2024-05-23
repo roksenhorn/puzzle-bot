@@ -161,7 +161,7 @@ def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_f
         photo_space_position = photo_space_positions[path]
         piece_metadata = metadata.copy()
         piece_metadata["photo_space_origin"] = photo_space_position
-        piece_metadata["original_photo_name"] = f
+        piece_metadata["original_photo_name"] = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"
         args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
         if id is not None:

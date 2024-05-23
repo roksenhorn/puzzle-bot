@@ -16,7 +16,7 @@ def dedupe_on_bmps(path):
     os.makedirs(os.path.join(path, "2a_segmented"), exist_ok=True)
     os.makedirs(os.path.join(path, "2b_thumbnails"), exist_ok=True)
 
-    # fill_islands(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "2a_segmented"))
+    fill_islands(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "2a_segmented"))
     thumbnail(input_path=os.path.join(path, "2a_segmented"), output_path=os.path.join(path, "2b_thumbnails"))
     ssd(input_path=os.path.join(path, "2b_thumbnails"))
 
