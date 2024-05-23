@@ -16,7 +16,7 @@ def solve(path, start_at=3):
     Given a path to processed piece data, finds a solution
     """
     if start_at <= 3:
-        _deduplicate(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
+        _deduplicate(batch_data_path=os.path.join(path, PHOTOS_DIR, "batch.json"), input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
     if start_at <= 4:
         connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
     else:
@@ -25,13 +25,13 @@ def solve(path, start_at=3):
     _move_pieces_into_place(puzzle=puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
 
-def _deduplicate(input_path, output_path):
+def _deduplicate(batch_data_path, input_path, output_path):
     """
     Often times the same piece was successfully extracted from multiple photos
     We do this on vectorized pieces to ignore noise in BMPs
     """
     print(f"\n{util.RED}### 3 - Deduplicating vector pieces ###{util.WHITE}\n")
-    count = dedupe.deduplicate(input_path, output_path)
+    count = dedupe.deduplicate(batch_data_path, input_path, output_path)
     if count != PUZZLE_NUM_PIECES:
         raise Exception(f"Expected {PUZZLE_NUM_PIECES} pieces, but found {count}")
 

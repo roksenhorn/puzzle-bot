@@ -16,7 +16,7 @@ SIDE_RESAMPLE_VERTEX_COUNT = 26
 
 
 class Side(object):
-    def __init__(self, piece_id, side_id, vertices, piece_center, is_edge, resample=False, rotate=True) -> None:
+    def __init__(self, piece_id, side_id, vertices, piece_center, is_edge, resample=False, rotate=True, photo_filename=None) -> None:
         self.piece_id = piece_id
         self.side_id = side_id
         self.piece_center = piece_center
@@ -24,6 +24,7 @@ class Side(object):
         self.vertices = vertices
         self.p1 = vertices[0]
         self.p2 = vertices[-1]
+        self.photo_filename = photo_filename
 
         if resample:
             vertices, self.v_length = util.resample_polyline(vertices, n=SIDE_RESAMPLE_VERTEX_COUNT)

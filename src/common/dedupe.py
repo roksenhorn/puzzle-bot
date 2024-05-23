@@ -13,7 +13,7 @@ DUPLICATE_THRESHOLD = 1.5
 SIDE_MISALIGNMENT_RAD = 15.0 * math.pi / 180
 
 
-def deduplicate(input_path, output_path):
+def deduplicate(batch_data_path, input_path, output_path):
     """
     Removes duplicate vector pieces by only copying over unique pieces to the output directory
     """
@@ -28,7 +28,9 @@ def deduplicate(input_path, output_path):
             json_path = input_path.joinpath(f'side_{i}_{j}.json')
             with open(json_path) as f:
                 data = json.load(f)
-                side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'], is_edge=data['is_edge'], resample=True, rotate=False)
+                side = sides.Side(i, j, data['vertices'], piece_center=data['piece_center'],
+                                  is_edge=data['is_edge'], resample=True, rotate=False,
+                                  photo_filename=data['original_photo_name'])
                 piece.append(side)
 
                 # we'll also want to know where in the photo frame this piece was
@@ -42,6 +44,13 @@ def deduplicate(input_path, output_path):
                 }
         pieces[i] = piece
 
+    # open the metadata that tells us where each piece was photographed
+    with open(batch_data_path) as f:
+        batch_data_d = json.load(f)["photos"]
+    batch_data = {}
+    for d in batch_data_d:
+        batch_data[d["file_name"]] = d["positions"]
+
     uniques = set()
     dupes = set()
 
@@ -51,10 +60,20 @@ def deduplicate(input_path, output_path):
             continue
 
         dupes_of_i = {}
-        # dupe_side_lens = {}
-        # dupe_side_lens[i] = sum([s.length for s in sides0])
+        piece_i_photo_filename = sides0[0].photo_filename
+        piece_i_gripper_position = batch_data[piece_i_photo_filename]
         for j, sides1 in pieces.items():
             if i == j:
+                continue
+
+            # speed up deduplication and make it less likely to have a false positive
+            # by first checking if the photos were taken near each other
+            piece_j_photo_filename = sides1[0].photo_filename
+            piece_j_gripper_position = batch_data[piece_j_photo_filename]
+            gripper_distance = util.distance(piece_i_gripper_position, piece_j_gripper_position)
+            pixel_distance = gripper_distance / APPROX_ROBOT_COUNTS_PER_PIXEL
+            if pixel_distance > 5000:
+                print(f"{i} -> {j} are {pixel_distance} px apart, no change of duplicate")
                 continue
 
             score = _compare(sides0, sides1)

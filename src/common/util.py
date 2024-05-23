@@ -58,6 +58,7 @@ def get_photo_orientation(img):
 def binary_pixel_data_for_photo(path, threshold, max_width=None, crop=None):
     """
     Given a bitmap image path, returns a 2D array of 1s and 0s
+    crop is either None or (top, right, bottom, left) in pixels
     """
     with Image.open(path) as img:
         if (orientation := get_photo_orientation(img)) is not None and orientation != EXPECTED_PHOTO_ORIENTATION:

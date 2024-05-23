@@ -29,6 +29,7 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
     metadata['scale_factor'] = scale_factor
     metadata['bmp_width'] = width
     metadata['bmp_height'] = height
+    metadata["original_photo_name"] = os.path.basename(photo_path)
 
     # 2 - extract pieces from the binary BMP
     extract_path = os.path.join(working_dir, SEGMENT_DIR)
@@ -154,11 +155,13 @@ def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_f
     for f in os.listdir(input_path):
         if not f.endswith('.bmp'):
             continue
+
         path = os.path.join(input_path, f)
         render = (i == id)
         photo_space_position = photo_space_positions[path]
         piece_metadata = metadata.copy()
         piece_metadata["photo_space_origin"] = photo_space_position
+        piece_metadata["original_photo_name"] = f
         args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
         if id is not None:

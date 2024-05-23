@@ -64,8 +64,8 @@ def _clean_and_save_piece(pixels, output_path, origin, scale_factor):
     PAD_BY = 1
     pixels = np.pad(pixels, pad_width=PAD_BY, mode='constant', constant_values=0)
 
-    # unscale the origin
-    photo_space_position = (origin[0] / scale_factor, origin[1] / scale_factor)
+    # unscale the origin and uncrop the photo
+    photo_space_position = (origin[0] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[-1], origin[1] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[0])
 
     # save a binary bitmpa
     w, h = pixels.shape
