@@ -933,21 +933,28 @@ def remove_stragglers(pixels):
     return False
 
 
-def remove_tiny_islands(pixels):
+def remove_tiny_islands(pixels, ignore_islands_along_border=False, island_value=1):
     visited = set()
     for i in range(len(pixels)):
         for j in range(len(pixels[i])):
-            if pixels[i][j] == 1 and (i, j) not in visited:
+            if pixels[i][j] == island_value and (i, j) not in visited:
                 island = set()
                 queue = [(i, j)]
+                touched_border = False
                 while queue:
                     x, y = queue.pop(0)
                     if (x, y) not in visited:
                         visited.add((x, y))
                         island.add((y, x))
                         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                            if 0 <= x + dx < len(pixels) and 0 <= y + dy < len(pixels[0]) and pixels[x + dx][y + dy] == 1:
+                            if 0 <= x + dx < len(pixels) and 0 <= y + dy < len(pixels[0]) and pixels[x + dx][y + dy] == island_value:
                                 queue.append((x + dx, y + dy))
+                        if x == 0 or y == 0 or x == len(pixels) - 1 or y == len(pixels[0]) - 1:
+                            touched_border = True
+
+                if ignore_islands_along_border and touched_border:
+                    continue
+
                 if len(island) < 100:
                     for x, y in island:
-                        pixels[y][x] = 0
+                        pixels[y][x] = 0 if island_value == 1 else 1
