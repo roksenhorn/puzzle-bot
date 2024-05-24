@@ -263,7 +263,7 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
 
     # generate a giant debug SVG of the final board
     svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-    svg += f'<svg width="3000" height="2000" viewBox="-10 -10 3020 2020" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+    svg += f'<svg width="5000" height="4000" viewBox="-10 -10 5020 4020" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
     colors = ['cc0000', '999900', '00aa99', '3300bb']
     for i, side in enumerate(viz_data):
         pts = ' '.join([','.join([str(e / 5.0) for e in v]) for v in side["vertices"]])
