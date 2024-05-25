@@ -609,7 +609,7 @@ class Vector(object):
         #
         # we don't go all the way up to the corner because the last little bit might be bent
         SLICE_MIN_DIST_FROM_CORNER = int(round(1.5 * SCALAR))
-        SLICE_MAX_DIST_FROM_CORNER = int(round(6.5 * SCALAR))
+        SLICE_MAX_DIST_FROM_CORNER = int(round(6.0 * SCALAR))
         for i in range(4):
             j = (i - 1) % 4
             side_i = self.sides[i]
@@ -621,7 +621,7 @@ class Vector(object):
             for v in side_i.vertices:
                 if util.distance(v, corner) >= SLICE_MIN_DIST_FROM_CORNER and \
                    util.distance(v, corner) <= SLICE_MAX_DIST_FROM_CORNER:
-                    side_i_slice.append(v)
+                    side_i_slice.insert(0, v)
 
             # and for side_j, we take the head end of the side
             side_j_slice = []
@@ -633,7 +633,7 @@ class Vector(object):
             # find the lines that best approximates those points
             angle_i = util.trendline(side_i_slice)
             angle_j = util.trendline(side_j_slice)
-            line_i = util.line_from_angle_and_point(angle=angle_i, point=side_i_slice[0], length=100)
+            line_i = util.line_from_angle_and_point(angle=angle_i, point=side_i_slice[-1], length=100)
             line_j = util.line_from_angle_and_point(angle=angle_j, point=side_j_slice[-1], length=100)
 
             # and the intersection of these lines is our new corner
