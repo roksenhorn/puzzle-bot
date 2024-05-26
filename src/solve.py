@@ -21,6 +21,7 @@ def solve(path, start_at=3):
         connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
     else:
         connectivity = None
+
     puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
     _move_pieces_into_place(puzzle=puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
 
@@ -85,6 +86,9 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
     viz_data = []
     placed_pieces = {}
 
+    # as we spiral around, we make sure each ring of the spiral is a perfect rectangle
+    spiral_width, spiral_height = (0, 0)
+
     # We'll place pieces by wrapping around the puzzle's border, starting at the top left corner
     # and rotating clockwise around the border, then spiraling inward
     x, y = (0, 0)
@@ -99,9 +103,9 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         if x == 0:  # left border: create a fake right side to the left
             placed_pieces[(x - 1, y)] = [[], [(0, 0), (0, 100)], [], []]  # `Right` side points down
         if x == puzzle.width - 1:  # right border: create a fake left side to the right
-            placed_pieces[(x + 1, y)] = [[], [], [], [(100, 100), (100, 0)]]  # `Left` side points up
+            placed_pieces[(x + 1, y)] = [[], [], [], [(spiral_width, 100), (spiral_width, 0)]]  # `Left` side points up
         if y == puzzle.height - 1:  # bottom border: create a fake top side below
-            placed_pieces[(x, y + 1)] = [[(0, 1000), (100, 1000)], [], [], []]  # `Top` side points left
+            placed_pieces[(x, y + 1)] = [[(0, spiral_height), (100, spiral_height)], [], [], []]  # `Top` side points left
 
         # Extract relevant sides from any neighbors that have already been placed (including fake pieces for the border)
         neighbor_above = placed_pieces.get((x, y - 1), [[], [], [], []])[2]  # grab the bottom side of the neighbor above us
@@ -179,39 +183,62 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         # but first, for border pieces, we need to know where the virtual neighbors would be
         # we previously made fake neighbor sides for the border to get the angle right
         # let's update the fake neighbors to match the actual positions these pieces should go
-        if y == 0:
-            origin = neighbor_left[0]
+        if y == 0:  # top border
+            origin_x = neighbor_left[0][0]
+            origin_y = 0  # force top border to be at y=0
             w = rotated_sides[new_top][-1][0] - rotated_sides[new_top][0][0]
-            neighbor_above = [(origin[0] + w, origin[1]), origin]
-        if x == puzzle.width - 1:
-            origin = neighbor_above[0]
+            neighbor_above = [(origin_x + w, origin_y), (origin_x, origin_y)]
+        if x == puzzle.width - 1:  # right border
+            if y == 0:
+                # when we've made it to the top right corner, figure out how wide the puzzle is
+                piece_width = rotated_sides[new_top][-1][0] - rotated_sides[new_top][0][0]
+                spiral_width = neighbor_left[0][0] + piece_width
+                print(f"Setting spiral_width to {spiral_width}")
+
+            origin_x = spiral_width  # force right border to be against x=spiral_width
+            origin_y = neighbor_above[0][1]
             h = rotated_sides[new_right][-1][1] - rotated_sides[new_right][0][1]
-            neighbor_right = [(origin[0], origin[1] + h), origin]
-        if y == puzzle.height - 1:
-            origin = neighbor_right[0]
+            neighbor_right = [(origin_x, origin_y + h), (origin_x, origin_y)]
+        if y == puzzle.height - 1:  # bottom border
+            if x == puzzle.width - 1:
+                # when we've made it to the bottom right corner, figure out how tall the puzzle is
+                piece_height = rotated_sides[new_right][-1][1] - rotated_sides[new_right][0][1]
+                spiral_height = neighbor_above[0][1] + piece_height
+                print(f"Setting spiral_height to {spiral_height}")
+
+            origin_x = neighbor_right[0][0]
+            origin_y = spiral_height  # force bottom border to be against y=spiral_height
             w = rotated_sides[new_bottom][-1][0] - rotated_sides[new_bottom][0][0]
-            neighbor_below = [(origin[0] - w, origin[1]), origin]
-        if x == 0 and y != 0:
+            neighbor_below = [(origin_x - w, origin_y), (origin_x, origin_y)]
+        if x == 0 and y != 0:  # left border, ignoring top left corner
             if y == puzzle.height - 1:
-                # bottom left corner needs to x-align with the width and y=align with the height
-                origin = neighbor_right[0]
+                # bottom left corner needs to x-align with 0 and y-align with the height
+                origin_x = 0
+                origin_y = spiral_height
                 w = rotated_sides[new_bottom][0][0] - rotated_sides[new_bottom][-1][0]
-                origin = (origin[0] - w, origin[1])
             else:
-                origin = neighbor_below[0]
+                origin_x = 0
+                origin_y = neighbor_below[0][1]
             h = rotated_sides[new_left][-1][1] - rotated_sides[new_left][0][1]
-            neighbor_left = [(origin[0], origin[1] - h), origin]
+            neighbor_left = [(origin_x, origin_y - h), (origin_x, origin_y)]
 
         # to get the best alignment, we want to average how much we'd need to translate to each of our existing neighbors
         samples = []
         if neighbor_above:
+            print(f"\t > Neighbor Above:")
             samples.append(util.subtract(neighbor_above[-1], rotated_sides[new_top][0]))
         if neighbor_right:
+            print(f"\t > Neighbor Right:")
             samples.append(util.subtract(neighbor_right[-1], rotated_sides[new_right][0]))
         if neighbor_below:
+            print(f"\t > Neighbor Below:")
             samples.append(util.subtract(neighbor_below[-1], rotated_sides[new_bottom][0]))
         if neighbor_left:
+            print(f"\t > Neighbor Left:")
             samples.append(util.subtract(neighbor_left[-1], rotated_sides[new_left][0]))
+
+        for sample in samples:
+            print(f"\t > Sample: {sample}")
 
         if x == 0 and y == 0:
             # make sure the first piece actually ends up at (0, 0)
@@ -252,12 +279,18 @@ def _move_pieces_into_place(puzzle, metadata_path, output_path):
         next_x, next_y = x + direction[0], y + direction[1]
         if next_x < 0 or next_x >= puzzle.width or next_y < 0 or next_y >= puzzle.height or placed_pieces.get((next_x, next_y)):
             if direction == (+1, 0):
+                # when we complete the top edge, we descend down the right edge
                 direction = (0, +1)
+                print("==================================")
+                print(f" ----> TURNING DOWN ----v    spiral_width: {spiral_width}")
             elif direction == (0, +1):
+                # when we complete the right edge, we move left along the bottom edge
                 direction = (-1, 0)
             elif direction == (-1, 0):
+                # when we complete the bottom edge, we move up the left edge
                 direction = (0, -1)
             elif direction == (0, -1):
+                # when we complete the left edge, we move right along the top edge
                 direction = (+1, 0)
         x, y = (x + direction[0], y + direction[1])
 
