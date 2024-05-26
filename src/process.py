@@ -58,26 +58,33 @@ def process_photo(photo_path, working_dir, starting_piece_id, robot_state):
     return piece_id
 
 
-def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_step=3):
+def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0, stop_before_step=3):
     """
     Given a path to a working directory that contains a 0_input subdirectory full of photos
     Batch processes them into digital puzzle piece information
 
+    robot_states: a dictionary of photo filenames to robot states
     start_at_step: the step to start processing at
     stop_before_step: the step to stop processing at
     id: only process the photo with this ID
     """
-    metadata = { "robot_state": {} }
 
     if start_at_step <= 0 and stop_before_step > 0:
         width, height, scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
     else:
-        # mock when skipping step 0
-        width, height, scale_factor = 1, 1, 1.0
+        # we'll need realistic data when skipping, so do the minimum amount of work
+        input_dir = os.path.join(path, PHOTOS_DIR)
+        f = [f for f in os.listdir(input_dir) if re.match(r'.*\.jpe?g', f)][0]
+        args = [os.path.join(input_dir, f), "/tmp/trash.bmp"]
+        width, height, scale_factor = bmp.photo_to_bmp(args)
+        print(f"BMPs are {width}x{height} @ scale {scale_factor}")
 
-    metadata['scale_factor'] = scale_factor
-    metadata['bmp_width'] = width
-    metadata['bmp_height'] = height
+    metadata = {
+        "robot_state": {},  # will get filled in for each piece when vectorizing
+        "scale_factor": scale_factor,
+        "bmp_width": width,
+        "bmp_height": height,
+    }
 
     photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:
@@ -91,7 +98,7 @@ def batch_process_photos(path, serialize, id=None, start_at_step=0, stop_before_
             photo_space_positions[os.path.join(path, SEGMENT_DIR, f)] = (0, 0)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        _vectorize(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
+        _vectorize_all(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, robot_states=robot_states, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
 
 
 def _bmp_all(input_path, output_path, id):
@@ -141,7 +148,7 @@ def _extract_all(input_path, output_path, scale_factor, id):
     return output
 
 
-def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_factor, id, serialize):
+def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_positions, scale_factor, id, serialize):
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
@@ -159,9 +166,11 @@ def _vectorize(input_path, output_path, metadata, photo_space_positions, scale_f
         path = os.path.join(input_path, f)
         render = (i == id)
         photo_space_position = photo_space_positions[path]
+        original_photo_name = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"  # reverse engineer the BMP name to the JPG
         piece_metadata = metadata.copy()
         piece_metadata["photo_space_origin"] = photo_space_position
-        piece_metadata["original_photo_name"] = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"
+        piece_metadata["original_photo_name"] = original_photo_name
+        piece_metadata["robot_state"] = {"photo_at_motor_position": robot_states[original_photo_name]}
         args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
         if id is not None:

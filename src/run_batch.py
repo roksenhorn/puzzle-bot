@@ -5,8 +5,10 @@ Entrypoint from the command line to find a puzzle solution from a batch of input
 
 import cProfile
 import argparse
+import posixpath
 import os
 import time
+import json
 
 import process, solve
 from common import util
@@ -39,7 +41,15 @@ def main():
 
     _prepare_new_run(path=args.path, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
 
-    process.batch_process_photos(path=args.path, serialize=args.serialize, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
+    # Open the batch.json file containing the robot position each photo was taken at
+    batch_info_file = posixpath.join(args.path, PHOTOS_DIR, "batch.json")
+    with open(batch_info_file, "r") as jsonfile:
+        batch_info = json.load(jsonfile)["photos"]
+    robot_states = {}
+    for d in batch_info:
+        robot_states[d["file_name"]] = d["position"]
+
+    process.batch_process_photos(path=args.path, serialize=args.serialize, robot_states=robot_states, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
     if args.stop_before_step is not None and args.stop_before_step >= 3:
         solve.solve(path=args.path, start_at=args.start_at_step)
 
