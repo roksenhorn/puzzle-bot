@@ -13,6 +13,7 @@ SEG_THRESH = 120  # raise this to cut tighter into the border
 PUZZLE_WIDTH = 40
 PUZZLE_HEIGHT = 25
 PUZZLE_NUM_PIECES = PUZZLE_WIDTH * PUZZLE_HEIGHT
+TIGHTEN_RELAX_PX = 3.5  # positive = add space between pieces, negative = remove space between pieces
 
 
 # Robot parameters

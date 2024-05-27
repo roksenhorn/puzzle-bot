@@ -5,7 +5,7 @@ Given a path to processed piece data, finds a solution
 import os
 import time
 
-from common import board, connect, dedupe, util, move
+from common import board, connect, dedupe, util, move, tighten
 from common.config import *
 
 
@@ -23,6 +23,9 @@ def solve(path, start_at=3):
     if start_at <= 5:
         puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
         move.move_pieces_into_place(puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
+
+    if start_at <= 6:
+        tighten.tighten_or_relax(solution_path=os.path.join(path, SOLUTION_DIR), output_path=os.path.join(path, TIGHTNESS_DIR))
 
 
 def _deduplicate(batch_data_path, input_path, output_path):
