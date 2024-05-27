@@ -54,7 +54,7 @@ def main():
 
 
 def _prepare_new_run(path):
-    for d in [PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR]:
+    for d in [PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR, TIGHTNESS_DIR]:
         os.makedirs(os.path.join(path, d), exist_ok=True)
         for f in os.listdir(os.path.join(path, d)):
             os.remove(os.path.join(path, d, f))

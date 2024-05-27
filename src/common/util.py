@@ -305,25 +305,6 @@ def translate_polyline(polyline, translation):
     return [(point[0] + translation[0], point[1] + translation[1]) for point in polyline]
 
 
-def slice(l: List, i: int, j: int) -> List:
-    """
-    Grabs a slice from the list, from index i through j
-    j can be lower than i, in which case the slice will "wrap" around the list
-    """
-    if i < 0:
-        i += len(l)
-    if j < 0:
-        j += len(l)
-    while i >= len(l):
-        i -= len(l)
-    while j >= len(l):
-        j -= len(l)
-    if i < j:
-        return l[i:j + 1]
-    else:
-        return l[i:] + l[:j + 1]
-
-
 def counterclockwise_angle_between_vectors(h, i, j):
     """
     Calculates the angle between two vectors, i->h and i->j, sweeping counter-clockwise
@@ -675,6 +656,7 @@ def trendline(points):
     angle = math.atan2(y[-1] - y[0], x[-1] - x[0])
     return angle % (2 * math.pi)
 
+
 def sublist_exists(lst, sub_lst):
     """
     Returns true if sub_lst is a sublist of lst
@@ -688,6 +670,32 @@ def sublist_exists(lst, sub_lst):
     lst_extended_str = ''.join(map(str, lst_extended))
 
     return sub_lst_str in lst_extended_str
+
+
+def slice(l: List, i: int, j: int) -> List:
+    """
+    Grabs a slice from the list, from index i through j
+    j can be lower than i, in which case the slice will "wrap" around the list
+    """
+    if i < 0:
+        i += len(l)
+    if j < 0:
+        j += len(l)
+    while i >= len(l):
+        i -= len(l)
+    while j >= len(l):
+        j -= len(l)
+    if i < j:
+        return l[i:j + 1]
+    else:
+        return l[i:] + l[:j + 1]
+
+
+def rotate_list(l, i):
+    """
+    Rotates the list l by i places, wrapping around the end
+    """
+    return l[i:] + l[:i]
 
 
 def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIECE_AREA):
