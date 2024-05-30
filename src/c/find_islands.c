@@ -1,3 +1,6 @@
+/*
+ * Usage: ./find_islands <input_directory> <output_directory> <min_island_area>
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,6 +11,7 @@
 #include <pthread.h>
 
 #define MAX_THREADS 14
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 /*
  * Island finding
@@ -20,6 +24,8 @@ typedef struct {
     int origin_y;
     int **matrix;
 } Island;
+
+int min_island_area = 0;
 
 void mark_island(int **grid, int rows, int cols, int x, int y, int **visited, int *min_x, int *max_x, int *min_y, int *max_y, int *area, int island_id) {
     typedef struct {
@@ -135,20 +141,20 @@ int _is_straggler(int **mat, int x, int y) {
     return neighbors <= 2;
 }
 
-void cleanup_island(Island *island) {
-    // Recursively clean up the matrix
-    int cleaned;
-    do {
-        cleaned = 0;
-        for (int i = 1; i < island->rows - 1; i++) {
-            for (int j = 1; j < island->cols - 1; j++) {
-                if (island->matrix[i][j] == 1 && _is_straggler(island->matrix, i, j)) {
-                    island->matrix[i][j] = 0;
-                    cleaned += 1;
-                }
+void remove_stragglers(int **matrix, int rows, int cols) {
+    // clean up any tiny stragglers where the island is only connected by a single point
+    for (int i = 1; i < rows - 1; i++) {
+        for (int j = 1; j < cols - 1; j++) {
+            if (matrix[i][j] == 1 && _is_straggler(matrix, i, j)) {
+                // any time we find a point that is dangling, remove it
+                matrix[i][j] = 0;
+                // removing this point might have made a prior point into another straggler
+                // so we backtrack and check this area again
+                i = max(1, i - 2);
+                j = max(1, j - 2);
             }
         }
-    } while (cleaned);
+    }
 }
 
 /*
@@ -321,16 +327,16 @@ void extract(const char *filepath, const char *filename, const char *output_dire
         return;
     }
 
-    int min_piece_area = 12000;
+    // first preprocess the image and remove any stragglers
+    remove_stragglers(grid, height, width);
+
+    // now extract all large islands that don't touch the border
     int ignore_islands_along_border = 1;
     int num_islands;
-
-    Island **islands = find_islands(grid, height, width, min_piece_area, ignore_islands_along_border, &num_islands);
+    Island **islands = find_islands(grid, height, width, min_island_area, ignore_islands_along_border, &num_islands);
 
     // Save each island as a BMP file
     for (int i = 0; i < num_islands; i++) {
-        cleanup_island(islands[i]);
-
         // remove ".bmp" from the end of the filename and add the island's origin coordinates
         char trimmed_filename[256];
         strcpy(trimmed_filename, filename);
@@ -379,10 +385,12 @@ void* worker(void* arg) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <input_directory> <output_directory> <min_island_area>\n", argv[0]);
         return 1;
     }
+
+    min_island_area = atoi(argv[3]);
 
     char *input_directory_path = argv[1];
     DIR *dir = opendir(input_directory_path);
