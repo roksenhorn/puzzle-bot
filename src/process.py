@@ -44,8 +44,6 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:
         photo_space_positions = _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), scale_factor=scale_factor)
-        print("Photo space positions:")
-        print(photo_space_positions)
     else:
         # mock when skipping step 1
         for f in os.listdir(os.path.join(path, SEGMENT_DIR)):

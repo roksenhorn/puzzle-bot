@@ -63,7 +63,7 @@ def deduplicate(batch_data_path, input_path, output_path):
         piece_i_photo_filename = sides0[0].photo_filename
         piece_i_gripper_position = batch_data[piece_i_photo_filename]
         for j, sides1 in pieces.items():
-            if i == j:
+            if i == j or j in dupes:
                 continue
 
             # speed up deduplication and make it less likely to have a false positive
@@ -123,20 +123,16 @@ def _pick_best_dupe(pieces):
     any_metadata = pieces[any_id]
     center = (any_metadata['photo_width']/2, any_metadata['photo_height']/2)
 
-    print(f"Choosing best dupe from {pieces}, center is {center}")
-
     # find which ID is closest to the center of the photo
     best_id = None
     best_score = 1000000
     for id, metadata in pieces.items():
         piece_center = metadata['photo_space_incenter']
         score = util.distance(center, piece_center)
-        print(f"[{id}] incenter@{piece_center} -> photo center@{center} => {score}")
         if score < best_score:
             best_id = id
             best_score = score
 
-    print(f"Best dupe is {best_id} with score {best_score}")
     return best_id
 
 
