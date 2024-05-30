@@ -37,12 +37,10 @@ def deduplicate(batch_data_path, input_path, output_path):
 
                 # we'll also want to know where in the photo frame this piece was
                 scale_factor = data['scale_factor']
-                photo_space_incenter = data['photo_space_incenter']
-                bmp_space_incenter = (photo_space_incenter[0] * scale_factor, photo_space_incenter[1] * scale_factor)
                 piece_photo_locations[i] = {
-                    'bmp_width': data['bmp_width'],
-                    'bmp_height': data['bmp_height'],
-                    'bmp_space_incenter': bmp_space_incenter,
+                    'photo_width': data['photo_width'],
+                    'photo_height': data['photo_height'],
+                    'photo_space_incenter': data['photo_space_incenter'],
                 }
         pieces[i] = piece
 
@@ -123,17 +121,22 @@ def _pick_best_dupe(pieces):
     # grab any element to get the center coordinate of any photo (half the width and height of the photo)
     any_id = next(iter(pieces))
     any_metadata = pieces[any_id]
-    center = (any_metadata['bmp_width']/2, any_metadata['bmp_height']/2)
+    center = (any_metadata['photo_width']/2, any_metadata['photo_height']/2)
+
+    print(f"Choosing best dupe from {pieces}, center is {center}")
 
     # find which ID is closest to the center of the photo
     best_id = None
     best_score = 1000000
     for id, metadata in pieces.items():
-        piece_center = metadata['bmp_space_incenter']
+        piece_center = metadata['photo_space_incenter']
         score = util.distance(center, piece_center)
+        print(f"[{id}] incenter@{piece_center} -> photo center@{center} => {score}")
         if score < best_score:
             best_id = id
             best_score = score
+
+    print(f"Best dupe is {best_id} with score {best_score}")
     return best_id
 
 

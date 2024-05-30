@@ -37,6 +37,8 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
         "scale_factor": scale_factor,
         "bmp_width": width,
         "bmp_height": height,
+        "photo_width": width * scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[1] + CROP_TOP_RIGHT_BOTTOM_LEFT[3],
+        "photo_height": height * scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[0] + CROP_TOP_RIGHT_BOTTOM_LEFT[2],
     }
 
     photo_space_positions = {}
