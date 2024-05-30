@@ -2,13 +2,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <pthread.h>
 
-#define MAX_THREADS 8
+#define MAX_THREADS 14
 
 /*
  * Island finding
@@ -61,13 +60,14 @@ void mark_island(int **grid, int rows, int cols, int x, int y, int **visited, in
 }
 
 Island *create_island(int min_x, int max_x, int min_y, int max_y) {
-    int rows = max_x - min_x + 1;
-    int cols = max_y - min_y + 1;
+    int padding = 1;
+    int rows = max_x - min_x + 1 + (2 * padding);
+    int cols = max_y - min_y + 1 + (2 * padding);
     Island *island = (Island *)malloc(sizeof(Island));
     island->rows = rows;
     island->cols = cols;
-    island->origin_x = min_x;
-    island->origin_y = min_y;
+    island->origin_x = min_x - padding;
+    island->origin_y = min_y - padding;
     island->matrix = (int **)malloc(rows * sizeof(int *));
     for (int i = 0; i < rows; i++) {
         island->matrix[i] = (int *)calloc(cols, sizeof(int));
@@ -99,7 +99,7 @@ Island **find_islands(int **grid, int rows, int cols, int min_island_area, int i
                     for (int x = min_x; x <= max_x; x++) {
                         for (int y = min_y; y <= max_y; y++) {
                             if (visited[x][y] == island_id) {
-                                new_island->matrix[x - min_x][y - min_y] = 1;
+                                new_island->matrix[x - min_x + 1][y - min_y + 1] = 1;
                             }
                         }
                     }
@@ -136,39 +136,15 @@ int _is_straggler(int **mat, int x, int y) {
 }
 
 void cleanup_island(Island *island) {
-    int rows = island->rows;
-    int cols = island->cols;
-    int **matrix = island->matrix;
-
-    // Create a padded copy of the matrix
-    int padded_rows = rows + 2;
-    int padded_cols = cols + 2;
-    int **padded_matrix = (int **)malloc(padded_rows * sizeof(int *));
-    for (int i = 0; i < padded_rows; i++) {
-        padded_matrix[i] = (int *)calloc(padded_cols, sizeof(int));
-    }
-
-    // Copy the original matrix into the padded matrix
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            padded_matrix[i + 2][j + 2] = matrix[i][j];
-        }
-    }
-    island->rows += 2;
-    island->cols += 2;
-    island->origin_x -= 1;
-    island->origin_y -= 1;
-    island->matrix = padded_matrix;
-
     // Recursively clean up the matrix
     int cleaned;
     do {
         cleaned = 0;
-        for (int i = 2; i < padded_rows - 2; i++) {
-            for (int j = 2; j < padded_cols - 2; j++) {
-                if (padded_matrix[i][j] == 1 && _is_straggler(padded_matrix, i, j)) {
-                    padded_matrix[i][j] = 0;
-                    cleaned = 1;
+        for (int i = 1; i < island->rows - 1; i++) {
+            for (int j = 1; j < island->cols - 1; j++) {
+                if (island->matrix[i][j] == 1 && _is_straggler(island->matrix, i, j)) {
+                    island->matrix[i][j] = 0;
+                    cleaned += 1;
                 }
             }
         }
@@ -337,7 +313,7 @@ void free_islands(Island **islands, int num_islands) {
  */
 
 void extract(const char *filepath, const char *filename, const char *output_directory_path) {
-    clock_t start = clock();
+    printf("Extracting from %s\n", filepath);
 
     int width, height;
     int **grid = load_binary_bitmap(filepath, &width, &height);
@@ -371,10 +347,6 @@ void extract(const char *filepath, const char *filename, const char *output_dire
         free(grid[i]);
     }
     free(grid);
-
-    clock_t end = clock();
-    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("Processing %s took %f seconds\n", filepath, time_spent);
 }
 
 typedef struct {

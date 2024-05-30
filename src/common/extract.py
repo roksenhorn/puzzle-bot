@@ -25,6 +25,7 @@ def batch_extract(input_path, output_path, scale_factor):
         subprocess.run(cmd, shell=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error running extract lib: {e}")
+        exit(1)
 
     output_photo_space_positions = {}
 
