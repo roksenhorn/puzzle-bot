@@ -88,10 +88,7 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
 
     photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:
-        output = _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), scale_factor=scale_factor)
-        photo_space_positions_list = [o[1] for o in output]
-        for d in photo_space_positions_list:
-            photo_space_positions.update(d)
+        photo_space_positions = _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), scale_factor=scale_factor)
     else:
         # mock when skipping step 1
         for f in os.listdir(os.path.join(path, SEGMENT_DIR)):
@@ -131,18 +128,10 @@ def _extract_all(input_path, output_path, scale_factor):
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
     print(f"\n{util.RED}### 1 - Extracting pieces from photo bitmaps ###{util.WHITE}\n")
-
-    # fs = [f for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
-    #
-    # args = []
-    # for f in fs:
-    #     input_img_path = os.path.join(input_path, f)
-    #     args.append([input_img_path, output_path, scale_factor])
-
-    # with multiprocessing.Pool(processes=os.cpu_count()) as pool:
-    #     output = pool.map(extract.extract_pieces, args)
+    start_time = time.time()
     output = extract.batch_extract(input_path, output_path, scale_factor)
-
+    duration = time.time() - start_time
+    print(f"Extracted {len(output)} pieces in {round(duration, 2)} seconds")
     return output
 
 

@@ -119,8 +119,64 @@ Island **find_islands(int **grid, int rows, int cols, int min_island_area, int i
 
     return islands;
 }
+
 /*
- * BMP loading
+ * Cleaning
+ */
+
+int _is_straggler(int **mat, int x, int y) {
+    int neighbors = 0;
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dy == 0) continue;
+            neighbors += mat[x + dx][y + dy];
+        }
+    }
+    return neighbors <= 2;
+}
+
+void cleanup_island(Island *island) {
+    int rows = island->rows;
+    int cols = island->cols;
+    int **matrix = island->matrix;
+
+    // Create a padded copy of the matrix
+    int padded_rows = rows + 2;
+    int padded_cols = cols + 2;
+    int **padded_matrix = (int **)malloc(padded_rows * sizeof(int *));
+    for (int i = 0; i < padded_rows; i++) {
+        padded_matrix[i] = (int *)calloc(padded_cols, sizeof(int));
+    }
+
+    // Copy the original matrix into the padded matrix
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            padded_matrix[i + 2][j + 2] = matrix[i][j];
+        }
+    }
+    island->rows += 2;
+    island->cols += 2;
+    island->origin_x -= 1;
+    island->origin_y -= 1;
+    island->matrix = padded_matrix;
+
+    // Recursively clean up the matrix
+    int cleaned;
+    do {
+        cleaned = 0;
+        for (int i = 2; i < padded_rows - 2; i++) {
+            for (int j = 2; j < padded_cols - 2; j++) {
+                if (padded_matrix[i][j] == 1 && _is_straggler(padded_matrix, i, j)) {
+                    padded_matrix[i][j] = 0;
+                    cleaned = 1;
+                }
+            }
+        }
+    } while (cleaned);
+}
+
+/*
+ * BMP utils
  */
 
 #pragma pack(push, 1)
@@ -297,7 +353,9 @@ void extract(const char *filepath, const char *filename, const char *output_dire
 
     // Save each island as a BMP file
     for (int i = 0; i < num_islands; i++) {
-         // remove ".bmp" from the end of the filename and add the island's origin coordinates
+        cleanup_island(islands[i]);
+
+        // remove ".bmp" from the end of the filename and add the island's origin coordinates
         char trimmed_filename[256];
         strcpy(trimmed_filename, filename);
         trimmed_filename[strlen(filename) - 4] = '\0';
@@ -345,13 +403,10 @@ void* worker(void* arg) {
         extract(task.filepath, task.filename, output_directory_path);
     }
 
-    printf("Thread finished\n");
     return NULL;
 }
 
 int main(int argc, char *argv[]) {
-    time_t start = time(NULL);
-
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
         return 1;
@@ -401,8 +456,5 @@ int main(int argc, char *argv[]) {
     }
     closedir(dir);
 
-    time_t end = time(NULL);
-    double time_spent = difftime(end, start);
-    printf("Total time: %f seconds\n", time_spent);
     return 0;
 }

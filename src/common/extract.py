@@ -1,5 +1,6 @@
 import os
 import PIL
+import re
 import numpy as np
 import subprocess
 
@@ -7,17 +8,37 @@ from common import util
 from common.config import *
 
 
-def batch_extract(photo_paths, output_path, scale_factor):
-    # gcc -o find_islands find_islands.c
+def batch_extract(input_path, output_path, scale_factor):
+    # just-in-time compile the C library to find islands
     cmd = f"gcc -o find_islands.o {os.path.join(os.path.dirname(__file__), '../c/find_islands.c')}"
     print(cmd)
     try:
         subprocess.run(cmd, shell=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e}")
+        print(f"Error compiling: {e}")
         exit(1)
 
-    exit(1)
+    # invoke the C library to find islands
+    cmd = f"./find_islands.o {input_path} {output_path}"
+    print(cmd)
+    try:
+        subprocess.run(cmd, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running extract lib: {e}")
+
+    output_photo_space_positions = {}
+
+    fs = [f for f in os.listdir(output_path) if re.match(r'.*\.bmp', f)]
+    for f in fs:
+        components = f.split('.')[0].split('_')
+        origin_component = components[-1]
+        origin_x, origin_y = origin_component.strip('(').strip(')').split(',')
+        origin = (int(origin_x), int(origin_y))
+
+        photo_space_position = (origin[0] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[-1], origin[1] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[0])
+        output_photo_space_positions[os.path.join(output_path, f)] = photo_space_position
+
+    return output_photo_space_positions
 
 
 def extract_pieces(args):
