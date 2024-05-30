@@ -343,7 +343,7 @@ void extract(const char *filepath, const char *filename, const char *output_dire
         trimmed_filename[strlen(filename) - 4] = '\0';
 
         char output_filename[256];
-        snprintf(output_filename, sizeof(output_filename), "%s/%s_(%d,%d).bmp", output_directory_path, trimmed_filename, islands[i]->origin_x, islands[i]->origin_y);
+        snprintf(output_filename, sizeof(output_filename), "%s/%s_(%d,%d).bmp", output_directory_path, trimmed_filename, islands[i]->origin_y, islands[i]->origin_x);
         save_island_as_bmp(islands[i], output_filename);
     }
 
