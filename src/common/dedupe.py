@@ -10,7 +10,7 @@ from common import util, sides
 from common.config import *
 
 
-DUPLICATE_THRESHOLD = 1.5
+DUPLICATE_THRESHOLD = 2.2
 SIDE_MISALIGNMENT_RAD = 15.0 * math.pi / 180
 
 

@@ -1,9 +1,23 @@
 import os
 import PIL
 import numpy as np
+import subprocess
 
 from common import util
 from common.config import *
+
+
+def batch_extract(photo_paths, output_path, scale_factor):
+    # gcc -o find_islands find_islands.c
+    cmd = f"gcc -o find_islands.o {os.path.join(os.path.dirname(__file__), '../c/find_islands.c')}"
+    print(cmd)
+    try:
+        subprocess.run(cmd, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        exit(1)
+
+    exit(1)
 
 
 def extract_pieces(args):

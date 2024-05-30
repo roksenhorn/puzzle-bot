@@ -4,7 +4,7 @@ Common configuration for the puzzle bot
 
 # Paramaters for photo segmentation
 SCALE_BMP_TO_WIDTH = None  # scale the BMP to this wide or None to turn off scaling
-CROP_TOP_RIGHT_BOTTOM_LEFT = (620, 860, 620, 860)  # crop the BMP by this many pixels on each side
+CROP_TOP_RIGHT_BOTTOM_LEFT = (0, 700, 400, 700)  # crop the BMP by this many pixels on each side
 MIN_PIECE_AREA = 200*200
 SEG_THRESH = 120  # raise this to cut tighter into the border
 
