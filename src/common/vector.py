@@ -7,6 +7,7 @@ import numpy as np
 import pathlib
 
 from common import sides, util
+from common.config import *
 
 
 # How much error to tolerate when simplifying the shape
@@ -140,6 +141,9 @@ class Vector(object):
     def from_file(filename, id) -> 'Vector':
         # Open image file
         binary_pixels, width, height = util.load_bmp_as_binary_pixels(filename)
+        if width > MAX_PIECE_DIMENSIONS[0] or height > MAX_PIECE_DIMENSIONS[1]:
+            raise Exception(f"!!!!!!!!!!\nPiece @ {id} {filename} is too large: {width}x{height} - are two pieces touching?")
+
         v = Vector(pixels=binary_pixels, width=width, height=height, id=id, filename=filename)
         return v
 
@@ -174,6 +178,10 @@ class Vector(object):
         photo_space_incenter = (photo_space_position[0] + (self.incenter[0] / scale_factor),
                                 photo_space_position[1] + (self.incenter[1] / scale_factor))
         metadata["photo_space_incenter"] = photo_space_incenter
+
+        photo_space_centroid = (photo_space_position[0] + (self.centroid[0] / scale_factor),
+                                photo_space_position[1] + (self.centroid[1] / scale_factor))
+        metadata["photo_space_centroid"] = photo_space_centroid
 
         if output_path:
             try:
