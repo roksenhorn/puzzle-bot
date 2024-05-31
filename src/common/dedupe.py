@@ -88,7 +88,7 @@ def deduplicate(batch_data_path, input_path, output_path):
                 # just for fun, let's compare geometries
                 score = _compare(sides0, sides1)
                 if score > DOUBLE_CHECK_GEOMETRIC_DUPLICATE_THRESHOLD:
-                    print(f"[{i}]\t is in the same position as {j} but they don't seem to match?!?s \t Similarity: {score}")
+                    print(f"[{i}]\t is in the same position as {j} but they don't seem to match. This is usually a problem... \t Geometric Similarity: {score}")
             elif pixel_distance < 2 * DUPLICATE_CENTROID_DELTA_PX:
                 print(f"\t\t\t[{i}]\t is similar to {j} \t Incenter distance: {pixel_distance}")
 

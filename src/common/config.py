@@ -23,7 +23,7 @@ APPROX_ROBOT_COUNTS_PER_PIXEL = 10
 
 
 # Deduplication
-DUPLICATE_CENTROID_DELTA_PX = 100
+DUPLICATE_CENTROID_DELTA_PX = 50
 
 
 # Directory structure for data processing
