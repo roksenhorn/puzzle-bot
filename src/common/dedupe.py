@@ -114,6 +114,6 @@ def ssd(input_path, original_path, output_path):
 
     for i in keeps:
         f = fs[i].split(os.path.sep)[-1]
-        input_img_path = os.path.join(original_path, f)
-        output_img_path = os.path.join(output_path, f)
+        input_img_path = Path(original_path).joinpath(f)
+        output_img_path = Path(output_path).joinpath(f)
         shutil.copy(input_img_path, output_img_path)
