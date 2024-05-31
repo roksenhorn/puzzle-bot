@@ -34,7 +34,7 @@ def batch_extract(input_path, output_path, scale_factor):
         origin = (int(origin_x), int(origin_y))
 
         photo_space_position = (origin[0] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[-1], origin[1] / scale_factor + CROP_TOP_RIGHT_BOTTOM_LEFT[0])
-        output_photo_space_positions[os.path.join(output_path, f)] = photo_space_position
+        output_photo_space_positions[f] = photo_space_position
         print(f"Extracted {f} at {photo_space_position}, origin {origin}")
 
     return output_photo_space_positions

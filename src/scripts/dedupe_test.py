@@ -1,9 +1,9 @@
 # Currently unused but useful for debugging
 import os
-import os
 import multiprocessing
 import re
 import PIL
+import shutil
 
 from common import util
 from common.config import *
@@ -16,10 +16,11 @@ THUMBNAIL_SIZE = 120
 def dedupe_on_bmps(path):
     os.makedirs(os.path.join(path, "2a_thumbnails"), exist_ok=True)
     os.makedirs(os.path.join(path, "2b_filled"), exist_ok=True)
+    os.makedirs(os.path.join(path, "2c_deduped"), exist_ok=True)
 
     thumbnail(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "2a_thumbnails"))
     fill_islands(input_path=os.path.join(path, "2a_thumbnails"), output_path=os.path.join(path, "2b_filled"))
-    ssd(input_path=os.path.join(path, "2b_filled"))
+    ssd(input_path=os.path.join(path, "2b_filled"), output_path=os.path.join(path, "2c_deduped"))
 
 
 def fill_islands(input_path, output_path):
@@ -76,7 +77,7 @@ def _thumbnail(args):
     padded_img.save(output_path)
 
 
-def ssd(input_path):
+def ssd(input_path, output_path):
     print("Running SSD between all thumbnails...")
     fs = [os.path.join(input_path, f) for f in os.listdir(input_path) if re.match(r'.*\.bmp', f)]
     images = [util.load_bmp_as_binary_pixels(f)[0] for f in fs]
@@ -104,9 +105,11 @@ def ssd(input_path):
     print(f"Starting with {len(images)} images")
     print(f"Removing {len(dupes)} images")
     print(f"Resulting in {len(keeps)} images")
-    # debug = sorted(debug, key=lambda x: x[2])
-    # for i, j, s in debug:
-    #     print(f"> Duplicate @ {s}: \t {i}.bmp {j}.bmp")
+
+    for i in keeps:
+        f = fs[i].split(os.path.sep)[-1]
+        output_img_path = os.path.join(output_path, f)
+        shutil.copy(fs[i], output_img_path)
 
 
 if __name__ == '__main__':

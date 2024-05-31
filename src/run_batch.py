@@ -16,7 +16,7 @@ from common.config import *
 
 
 def _prepare_new_run(path, start_at_step, stop_before_step):
-    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, VECTOR_DIR, DEDUPED_DIR, CONNECTIVITY_DIR, SOLUTION_DIR, TIGHTNESS_DIR]):
+    for i, d in enumerate([PHOTOS_DIR, PHOTO_BMP_DIR, SEGMENT_DIR, DEDUPED_DIR, VECTOR_DIR, CONNECTIVITY_DIR, SOLUTION_DIR, TIGHTNESS_DIR]):
         os.makedirs(os.path.join(path, d), exist_ok=True)
 
         if os.path.exists(os.path.join(path, d, '.DS_Store')):

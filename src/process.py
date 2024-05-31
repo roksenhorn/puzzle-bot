@@ -7,7 +7,7 @@ import time
 import multiprocessing
 import re
 
-from common import bmp, extract, util, vector
+from common import bmp, extract, util, vector, dedupe
 from common.config import *
 
 
@@ -47,17 +47,20 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     else:
         # mock when skipping step 1
         for f in os.listdir(os.path.join(path, SEGMENT_DIR)):
-            photo_space_positions[os.path.join(path, SEGMENT_DIR, f)] = (0, 0)
+            photo_space_positions[f] = (0, 0)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        _vectorize_all(input_path=os.path.join(path, SEGMENT_DIR), metadata=metadata, robot_states=robot_states, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
+        dedupe.bmp_deduplicate(path=path, output_path=os.path.join(path, DEDUPED_DIR))
+
+    if start_at_step <= 3 and stop_before_step > 3:
+        _vectorize_all(input_path=os.path.join(path, DEDUPED_DIR), metadata=metadata, robot_states=robot_states, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
 
 
 def _bmp_all(input_path, output_path, id):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
-    print(f"\n{util.RED}### 0 - Segmenting photos into binary images ###{util.WHITE}\n")
+    print(f"\n{util.BLUE}### 0 - Segmenting photos into binary images ###{util.WHITE}\n")
 
     if id:
         fs = [f'{id}.jpeg']
@@ -82,7 +85,7 @@ def _extract_all(input_path, output_path, scale_factor):
     """
     Loads each photograph in the input directory and saves off a scaled black-and-white BMP in the output directory
     """
-    print(f"\n{util.RED}### 1 - Extracting pieces from photo bitmaps ###{util.WHITE}\n")
+    print(f"\n{util.BLUE}### 1 - Extracting pieces from photo bitmaps ###{util.WHITE}\n")
     start_time = time.time()
     output = extract.batch_extract(input_path, output_path, scale_factor)
     duration = time.time() - start_time
@@ -94,7 +97,7 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
     """
     Loads each image.bmp in the input directory, converts it to an SVG in the output directory
     """
-    print(f"\n{util.RED}### 2 - Vectorizing ###{util.WHITE}\n")
+    print(f"\n{util.BLUE}### 3 - Vectorizing ###{util.WHITE}\n")
 
     start_time = time.time()
     i = id if id is not None else 1
@@ -107,7 +110,7 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
 
         path = os.path.join(input_path, f)
         render = (i == id)
-        photo_space_position = photo_space_positions[path]
+        photo_space_position = photo_space_positions[f]
         original_photo_name = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"  # reverse engineer the BMP name to the JPG
         piece_metadata = metadata.copy()
         piece_metadata["photo_space_origin"] = photo_space_position
