@@ -50,6 +50,7 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
             photo_space_positions[f] = (0, 0)
 
     if start_at_step <= 2 and stop_before_step > 2:
+        print(f"\n{util.BLUE}### 2 - Deleting duplicates ###{util.WHITE}\n")
         dedupe.bmp_deduplicate(path=path, output_path=os.path.join(path, DEDUPED_DIR))
 
     if start_at_step <= 3 and stop_before_step > 3:

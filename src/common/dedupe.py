@@ -13,20 +13,26 @@ from common import util, sides
 from common.config import *
 
 
-BMP_DUPLICATE_THRESHOLD = 3.0
 THUMBNAIL_SIZE = 120
-
-DUPLICATE_THRESHOLD = 2.2
-SIDE_MISALIGNMENT_RAD = 15.0 * math.pi / 180
 
 
 def bmp_deduplicate(path, output_path):
-    os.makedirs(os.path.join(path, "3a_thumbnails"), exist_ok=True)
-    os.makedirs(os.path.join(path, "3b_filled"), exist_ok=True)
+    THUMBNAIL_DIR = os.path.join(path, "3a_thumbnails")
+    FILLED_DIR = os.path.join(path, "3b_filled")
 
-    thumbnail(input_path=os.path.join(path, SEGMENT_DIR), output_path=os.path.join(path, "3a_thumbnails"))
-    fill_islands(input_path=os.path.join(path, "3a_thumbnails"), output_path=os.path.join(path, "3b_filled"))
-    ssd(input_path=os.path.join(path, "3b_filled"), original_path=os.path.join(path, SEGMENT_DIR), output_path=output_path)
+    if os.path.exists(THUMBNAIL_DIR):
+        shutil.rmtree(THUMBNAIL_DIR)
+    os.makedirs(THUMBNAIL_DIR)
+
+    if os.path.exists(FILLED_DIR):
+        shutil.rmtree(FILLED_DIR)
+    os.makedirs(FILLED_DIR)
+
+    thumbnail(input_path=os.path.join(path, SEGMENT_DIR), output_path=THUMBNAIL_DIR)
+    fill_islands(input_path=THUMBNAIL_DIR, output_path=FILLED_DIR)
+    unique_count = ssd(input_path=FILLED_DIR, original_path=os.path.join(path, SEGMENT_DIR), output_path=output_path)
+    if unique_count != PUZZLE_WIDTH * PUZZLE_HEIGHT:
+        raise Exception(f"Expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} unique pieces, found {unique_count}")
 
 
 def fill_islands(input_path, output_path):
@@ -111,9 +117,14 @@ def ssd(input_path, original_path, output_path):
     print(f"Starting with {len(images)} images")
     print(f"Removing {len(dupes)} images")
     print(f"Resulting in {len(keeps)} images")
+    debug = sorted(debug, key=lambda x: x[2])
+    for i, j, s in debug:
+        print(f"> Duplicate @ {s}: \t {i}.bmp {j}.bmp")
 
     for i in keeps:
         f = fs[i].split(os.path.sep)[-1]
         input_img_path = os.path.join(original_path, f)
         output_img_path = os.path.join(output_path, f)
         shutil.copy(input_img_path, output_img_path)
+
+    return len(keeps)
