@@ -6,6 +6,7 @@ import os
 import time
 import multiprocessing
 import re
+import pathlib
 
 from common import bmp, extract, util, vector, dedupe
 from common.config import *
@@ -23,12 +24,12 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     """
 
     if start_at_step <= 0 and stop_before_step > 0:
-        width, height, scale_factor = _bmp_all(input_path=os.path.join(path, PHOTOS_DIR), output_path=os.path.join(path, PHOTO_BMP_DIR), id=id)
+        width, height, scale_factor = _bmp_all(input_path=pathlib.Path(path).joinpath(PHOTOS_DIR), output_path=pathlib.Path(path).joinpath(PHOTO_BMP_DIR), id=id)
     else:
         # we'll need realistic data when skipping, so do the minimum amount of work
-        input_dir = os.path.join(path, PHOTOS_DIR)
+        input_dir = pathlib.Path(path).joinpath(PHOTOS_DIR)
         f = [f for f in os.listdir(input_dir) if re.match(r'.*\.jpe?g', f)][0]
-        args = [os.path.join(input_dir, f), "/tmp/trash.bmp"]
+        args = [pathlib.Path(input_dir).joinpath(f), "C:/Temp/trash.bmp"]
         width, height, scale_factor = bmp.photo_to_bmp(args)
         print(f"BMPs are {width}x{height} @ scale {scale_factor}")
 
@@ -43,17 +44,17 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
 
     photo_space_positions = {}
     if start_at_step <= 1 and stop_before_step > 1:
-        photo_space_positions = _extract_all(input_path=os.path.join(path, PHOTO_BMP_DIR), output_path=os.path.join(path, SEGMENT_DIR), scale_factor=scale_factor)
+        photo_space_positions = _extract_all(input_path=pathlib.Path(path).joinpath(PHOTO_BMP_DIR), output_path=pathlib.Path(path).joinpath(SEGMENT_DIR), scale_factor=scale_factor)
     else:
         # mock when skipping step 1
-        for f in os.listdir(os.path.join(path, SEGMENT_DIR)):
+        for f in os.listdir(pathlib.Path(path).joinpath(SEGMENT_DIR)):
             photo_space_positions[f] = (0, 0)
 
     if start_at_step <= 2 and stop_before_step > 2:
-        dedupe.bmp_deduplicate(path=path, output_path=os.path.join(path, DEDUPED_DIR))
+        dedupe.bmp_deduplicate(path=path, output_path=pathlib.Path(path).joinpath(DEDUPED_DIR))
 
     if start_at_step <= 3 and stop_before_step > 3:
-        _vectorize_all(input_path=os.path.join(path, DEDUPED_DIR), metadata=metadata, robot_states=robot_states, output_path=os.path.join(path, VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
+        _vectorize_all(input_path=pathlib.Path(path).joinpath(SEGMENT_DIR), metadata=metadata, robot_states=robot_states, output_path=pathlib.Path(path).joinpath(VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
 
 
 def _bmp_all(input_path, output_path, id):
@@ -69,9 +70,9 @@ def _bmp_all(input_path, output_path, id):
 
     args = []
     for f in fs:
-        input_img_path = os.path.join(input_path, f)
+        input_img_path = pathlib.Path(input_path).joinpath(f)
         output_name = f.split('.')[0]
-        output_img_path = os.path.join(output_path, f'{output_name}.bmp')
+        output_img_path = pathlib.Path(output_path).joinpath(f'{output_name}.bmp')
         args.append([input_img_path, output_img_path])
 
     with multiprocessing.Pool(processes=os.cpu_count()) as pool:
@@ -108,7 +109,7 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
         if not f.endswith('.bmp'):
             continue
 
-        path = os.path.join(input_path, f)
+        path = pathlib.Path(input_path).joinpath(f)
         render = (i == id)
         photo_space_position = photo_space_positions[f]
         original_photo_name = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"  # reverse engineer the BMP name to the JPG

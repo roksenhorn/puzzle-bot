@@ -6,7 +6,7 @@ Common configuration for the puzzle bot
 SCALE_BMP_TO_WIDTH = None  # scale the BMP to this wide or None to turn off scaling
 CROP_TOP_RIGHT_BOTTOM_LEFT = (620, 860, 620, 860)  # crop the BMP by this many pixels on each side
 MIN_PIECE_AREA = 200*200
-SEG_THRESH = 120  # raise this to cut tighter into the border
+SEG_THRESH = 130  # raise this to cut tighter into the border
 
 
 # dimensions for the puzzle you're solving

@@ -4,6 +4,7 @@ import math
 import os
 from typing import List
 import numpy as np
+import pathlib
 
 from common import sides, util
 
@@ -219,14 +220,14 @@ class Vector(object):
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{50.0 / d}" style="fill:#ff770022; stroke-width:0" />'
         svg += f'<circle cx="{self.incenter[0] / d}" cy="{self.incenter[1] / d}" r="{1.0}" style="fill:#ff7700; stroke-width:0" />'
         svg += '</svg>'
-        filename = self.filename.split(os.path.sep)[-1].split('.')[0]
-        svg_path = os.path.join(output_path, f"{self.id}_{filename}.svg")
+        filename = self.filename.parts[-1].split('.')[0]
+        svg_path = pathlib.Path(output_path).joinpath(f"{self.id}_{filename}.svg")
         with open(svg_path, 'w') as f:
             f.write(svg)
 
         # Then we save off the side data for future processing steps
         for i, side in enumerate(self.sides):
-            side_path = os.path.join(output_path, f"side_{self.id}_{i}.json")
+            side_path = pathlib.Path(output_path).joinpath(f"side_{self.id}_{i}.json")
             # convert vertices from np types to native python types
             vertices = [[int(v[0]), int(v[1])] for v in side.vertices]
             metadata['piece_id'] = self.id
