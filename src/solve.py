@@ -5,7 +5,7 @@ Given a path to processed piece data, finds a solution
 import os
 import time
 
-from common import board, connect, dedupe, util, move, spacing
+from common import board, connect, util, move, spacing
 from common.config import *
 
 
@@ -13,10 +13,8 @@ def solve(path, start_at=3):
     """
     Given a path to processed piece data, finds a solution
     """
-    if start_at <= 3:
-        _deduplicate(batch_data_path=os.path.join(path, PHOTOS_DIR, "batch.json"), input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, DEDUPED_DIR))
     if start_at <= 4:
-        connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+        connectivity = _find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
     else:
         connectivity = None
 
@@ -26,17 +24,6 @@ def solve(path, start_at=3):
 
     if start_at <= 6:
         spacing.tighten_or_relax(solution_path=os.path.join(path, SOLUTION_DIR), output_path=os.path.join(path, TIGHTNESS_DIR))
-
-
-def _deduplicate(batch_data_path, input_path, output_path):
-    """
-    Often times the same piece was successfully extracted from multiple photos
-    We do this on vectorized pieces to ignore noise in BMPs
-    """
-    print(f"\n{util.RED}### 3 - Deduplicating vector pieces ###{util.WHITE}\n")
-    count = dedupe.deduplicate(batch_data_path, input_path, output_path)
-    if count != PUZZLE_NUM_PIECES:
-        raise Exception(f"Expected {PUZZLE_NUM_PIECES} pieces, but found {count}")
 
 
 def _find_connectivity(input_path, output_path):
