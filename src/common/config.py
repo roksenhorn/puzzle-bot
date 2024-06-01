@@ -14,7 +14,7 @@ TIGHTEN_RELAX_PX = 3.5  # positive = add space between pieces, negative = remove
 SCALE_BMP_TO_WIDTH = None  # scale the BMP to this wide or None to turn off scaling
 CROP_TOP_RIGHT_BOTTOM_LEFT = (620, 860, 620, 860)  # crop the BMP by this many pixels on each side
 MIN_PIECE_AREA = 400*400
-MAX_PIECE_DIMENSIONS = (1260, 1260)  # we use this to catch when two pieces are touching
+MAX_PIECE_DIMENSIONS = (1300, 1300)  # we use this to catch when two pieces are touching
 SEG_THRESH = 130  # raise this to cut tighter into the border
 
 
