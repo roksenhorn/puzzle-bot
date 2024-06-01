@@ -13,16 +13,16 @@ def solve(path, start_at=3):
     """
     Given a path to processed piece data, finds a solution
     """
-    if start_at <= 4:
-        connectivity = _find_connectivity(input_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
+    if start_at <= 5:
+        connectivity = _find_connectivity(input_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, CONNECTIVITY_DIR))
     else:
         connectivity = None
 
-    if start_at <= 5:
-        puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
-        move.move_pieces_into_place(puzzle, metadata_path=os.path.join(path, VECTOR_DIR), output_path=os.path.join(path, SOLUTION_DIR))
-
     if start_at <= 6:
+        puzzle = _build_board(connectivity=connectivity, input_path=os.path.join(path, CONNECTIVITY_DIR), output_path=os.path.join(path, SOLUTION_DIR), metadata_path=os.path.join(path, VECTOR_DIR))
+        move.move_pieces_into_place(puzzle, metadata_path=os.path.join(path, DEDUPED_DIR), output_path=os.path.join(path, SOLUTION_DIR))
+
+    if start_at <= 7:
         spacing.tighten_or_relax(solution_path=os.path.join(path, SOLUTION_DIR), output_path=os.path.join(path, TIGHTNESS_DIR))
 
 
