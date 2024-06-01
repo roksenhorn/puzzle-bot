@@ -71,7 +71,7 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
         )
 
     if start_at_step <= 4 and stop_before_step > 4:
-        dedupe.duplicate(
+        dedupe.deduplicate(
             batch_data_path = pathlib.Path(path).joinpath(PHOTOS_DIR).joinpath("batch.json"),
             input_path = pathlib.Path(path).joinpath(VECTOR_DIR),
             output_path = pathlib.Path(path).joinpath(DEDUPED_DIR)
