@@ -23,8 +23,12 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     id: only process the photo with this ID
     """
 
-    if start_at_step <= 0 and stop_before_step > 0:
-        width, height, scale_factor = _bmp_all(input_path=pathlib.Path(path).joinpath(PHOTOS_DIR), output_path=pathlib.Path(path).joinpath(PHOTO_BMP_DIR), id=id)
+    if start_at_step <= 1 and stop_before_step > 1:
+        width, height, scale_factor = _bmp_all(
+            input_path = pathlib.Path(path).joinpath(PHOTOS_DIR), 
+            output_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR), 
+            id = id
+        )
     else:
         # we'll need realistic data when skipping, so do the minimum amount of work
         input_dir = pathlib.Path(path).joinpath(PHOTOS_DIR)
@@ -43,18 +47,35 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     }
 
     photo_space_positions = {}
-    if start_at_step <= 1 and stop_before_step > 1:
-        photo_space_positions = _extract_all(input_path=pathlib.Path(path).joinpath(PHOTO_BMP_DIR), output_path=pathlib.Path(path).joinpath(SEGMENT_DIR), scale_factor=scale_factor)
+    if start_at_step <= 2 and stop_before_step > 2:
+        photo_space_positions = _extract_all(
+            input_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR), 
+            output_path = pathlib.Path(path).joinpath(SEGMENT_DIR),
+            scale_factor = scale_factor
+        )
     else:
-        # mock when skipping step 1
+        # mock when skipping step 2
         for f in os.listdir(pathlib.Path(path).joinpath(SEGMENT_DIR)):
             photo_space_positions[f] = (0, 0)
 
-    if start_at_step <= 2 and stop_before_step > 2:
-        dedupe.bmp_deduplicate(path=path, output_path=pathlib.Path(path).joinpath(DEDUPED_DIR))
-
     if start_at_step <= 3 and stop_before_step > 3:
-        _vectorize_all(input_path=pathlib.Path(path).joinpath(SEGMENT_DIR), metadata=metadata, robot_states=robot_states, output_path=pathlib.Path(path).joinpath(VECTOR_DIR), photo_space_positions=photo_space_positions, scale_factor=scale_factor, id=id, serialize=serialize)
+        _vectorize_all(
+            input_path = pathlib.Path(path).joinpath(SEGMENT_DIR), 
+            metadata = metadata, 
+            robot_states = robot_states, 
+            output_path = pathlib.Path(path).joinpath(VECTOR_DIR), 
+            photo_space_positions = photo_space_positions, 
+            scale_factor = scale_factor, 
+            id = id, 
+            serialize = serialize
+        )
+
+    if start_at_step <= 4 and stop_before_step > 4:
+        dedupe.duplicate(
+            batch_data_path = pathlib.Path(path).joinpath(PHOTOS_DIR).joinpath("batch.json"),
+            input_path = pathlib.Path(path).joinpath(VECTOR_DIR),
+            output_path = pathlib.Path(path).joinpath(DEDUPED_DIR)
+        )
 
 
 def _bmp_all(input_path, output_path, id):

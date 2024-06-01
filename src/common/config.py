@@ -14,7 +14,7 @@ TIGHTEN_RELAX_PX = 3.5  # positive = add space between pieces, negative = remove
 SCALE_BMP_TO_WIDTH = None  # scale the BMP to this wide or None to turn off scaling
 CROP_TOP_RIGHT_BOTTOM_LEFT = (620, 860, 620, 860)  # crop the BMP by this many pixels on each side
 MIN_PIECE_AREA = 400*400
-MAX_PIECE_DIMENSIONS = (1250, 1250)  # we use this to catch when two pieces are touching
+MAX_PIECE_DIMENSIONS = (1300, 1300)  # we use this to catch when two pieces are touching
 SEG_THRESH = 130  # raise this to cut tighter into the border
 
 
@@ -25,7 +25,6 @@ APPROX_ROBOT_COUNTS_PER_PIXEL = 10
 # Deduplication
 DUPLICATE_CENTROID_DELTA_PX = 50
 
-
 # Directory structure for data processing
 # Step 1 takes in photos of pieces on the bed and outputs binary BMPs of those photos
 PHOTOS_DIR = '0_photos'
@@ -34,11 +33,11 @@ PHOTO_BMP_DIR = '1_photo_bmps'
 # Step 2 takes in photo BMPs and outputs cleaned up individual pieces as bitmaps
 SEGMENT_DIR = '2_segmented'
 
-# Step 3 goes through all the vector pieces and deletes duplicates
-DEDUPED_DIR = '3_deduped'
+# Step 3 takes in piece BMPs and outputs SVGs
+VECTOR_DIR = '3_vector'
 
-# Step 4 takes in piece BMPs and outputs SVGs
-VECTOR_DIR = '4_vector'
+# Step 4 goes through all the vector pieces and deletes duplicates
+DEDUPED_DIR = '4_deduped'
 
 # Step 5 takes in SVGs and outputs a graph of connectivity
 CONNECTIVITY_DIR = '5_connectivity'
