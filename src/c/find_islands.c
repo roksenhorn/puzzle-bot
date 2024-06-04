@@ -356,8 +356,8 @@ void extract(const char *filepath, const char *filename, const char *output_dire
 }
 
 typedef struct {
-    char filepath[128];
-    char filename[128];
+    char filepath[1024];
+    char filename[1024];
 } Task;
 
 Task task_queue[5000];
