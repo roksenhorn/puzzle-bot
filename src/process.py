@@ -7,6 +7,7 @@ import time
 import multiprocessing
 import re
 import pathlib
+import json
 
 from common import bmp, extract, util, vector, dedupe
 from common.config import *
@@ -33,7 +34,10 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
         # we'll need realistic data when skipping, so do the minimum amount of work
         input_dir = pathlib.Path(path).joinpath(PHOTOS_DIR)
         f = [f for f in os.listdir(input_dir) if re.match(r'.*\.jpe?g', f)][0]
-        args = [pathlib.Path(input_dir).joinpath(f), "C:/Temp/trash.bmp"]
+        if os.path.exists("/dev/null"):
+            args = [pathlib.Path(input_dir).joinpath(f), "/tmp/trash.bmp"]
+        else:
+            args = [pathlib.Path(input_dir).joinpath(f), "C:/Temp/trash.bmp"]
         width, height, scale_factor = bmp.photo_to_bmp(args)
         print(f"BMPs are {width}x{height} @ scale {scale_factor}")
 
@@ -49,32 +53,34 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     photo_space_positions = {}
     if start_at_step <= 2 and stop_before_step > 2:
         photo_space_positions = _extract_all(
-            input_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR),
-            output_path = pathlib.Path(path).joinpath(SEGMENT_DIR),
-            scale_factor = scale_factor
+            input_path=pathlib.Path(path).joinpath(PHOTO_BMP_DIR),
+            output_path=pathlib.Path(path).joinpath(SEGMENT_DIR),
+            scale_factor=scale_factor
         )
+        with open(pathlib.Path(path).joinpath(SEGMENT_DIR).joinpath("photo_space_positions.json"), "w") as f:
+            json.dump(photo_space_positions, f)
     else:
-        # mock when skipping step 2
-        for f in os.listdir(pathlib.Path(path).joinpath(SEGMENT_DIR)):
-            photo_space_positions[f] = (0, 0)
+        with open(pathlib.Path(path).joinpath(SEGMENT_DIR).joinpath("photo_space_positions.json")) as f:
+            photo_space_positions = json.load(f)
+        print(f"Loaded {len(photo_space_positions)} photo space positions")
 
     if start_at_step <= 3 and stop_before_step > 3:
         _vectorize_all(
-            input_path = pathlib.Path(path).joinpath(SEGMENT_DIR),
-            metadata = metadata,
-            robot_states = robot_states,
-            output_path = pathlib.Path(path).joinpath(VECTOR_DIR),
-            photo_space_positions = photo_space_positions,
-            scale_factor = scale_factor,
-            id = id,
-            serialize = serialize
+            input_path=pathlib.Path(path).joinpath(SEGMENT_DIR),
+            metadata=metadata,
+            robot_states=robot_states,
+            output_path=pathlib.Path(path).joinpath(VECTOR_DIR),
+            photo_space_positions=photo_space_positions,
+            scale_factor=scale_factor,
+            id=id,
+            serialize=serialize
         )
 
     if start_at_step <= 4 and stop_before_step > 4:
         count = dedupe.deduplicate(
-            batch_data_path = pathlib.Path(path).joinpath(PHOTOS_DIR).joinpath("batch.json"),
-            input_path = pathlib.Path(path).joinpath(VECTOR_DIR),
-            output_path = pathlib.Path(path).joinpath(DEDUPED_DIR)
+            batch_data_path=pathlib.Path(path).joinpath(PHOTOS_DIR).joinpath("batch.json"),
+            input_path=pathlib.Path(path).joinpath(VECTOR_DIR),
+            output_path=pathlib.Path(path).joinpath(DEDUPED_DIR)
         )
         if count != PUZZLE_WIDTH * PUZZLE_HEIGHT:
             raise Exception(f"dedupe: expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces but ended up with {count} unique pieces")
