@@ -77,12 +77,12 @@ def deduplicate(batch_data_path, input_path, output_path):
             # duplicates are pieces in the same physical location
             piece_j_photo_filename = sides1[0].photo_filename
             piece_j_robot_space_camera_position = batch_data[piece_j_photo_filename]
-            piece_j_motor_space_incenter = _photo_space_to_robot_space(piece_j_robot_space_camera_position, piece_photo_locations[j]['photo_space_centroid'])
+            piece_j_motor_space_centroid = _photo_space_to_robot_space(piece_j_robot_space_camera_position, piece_photo_locations[j]['photo_space_centroid'])
 
-            motor_space_incenter_distance = util.distance(piece_i_motor_space_centroid, piece_j_motor_space_incenter)
-            pixel_distance = motor_space_incenter_distance / APPROX_ROBOT_COUNTS_PER_PIXEL
+            motor_space_centroid_distance = util.distance(piece_i_motor_space_centroid, piece_j_motor_space_centroid)
+            pixel_distance = motor_space_centroid_distance / APPROX_ROBOT_COUNTS_PER_PIXEL
             if pixel_distance < DUPLICATE_CENTROID_DELTA_PX:
-                print(f"[{i}]\t is duplicated by {j} \t Incenter distance: {pixel_distance}")
+                print(f"[{i}]\t is duplicated by {j} \t Centroid distance: {pixel_distance}")
                 dupes_of_i[j] = piece_photo_locations[j]
 
                 # just for fun, let's compare geometries
@@ -90,7 +90,7 @@ def deduplicate(batch_data_path, input_path, output_path):
                 if score > DOUBLE_CHECK_GEOMETRIC_DUPLICATE_THRESHOLD:
                     print(f"[{i}]\t is in the same position as {j} but they don't seem to match. This is usually a problem... \t Geometric Similarity: {score}")
             elif pixel_distance < 2 * DUPLICATE_CENTROID_DELTA_PX:
-                print(f"\t\t\t[{i}]\t is similar to {j} \t Incenter distance: {pixel_distance}")
+                print(f"\t\t\t[{i}]\t is similar to {j} \t Centroid distance: {pixel_distance}")
 
         if len(dupes_of_i) == 0:
             # if this piece was truly unique, keep it
