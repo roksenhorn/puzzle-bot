@@ -15,7 +15,7 @@ SCALE_BMP_TO_WIDTH = None  # scale the BMP to this wide or None to turn off scal
 CROP_TOP_RIGHT_BOTTOM_LEFT = (620, 860, 620, 860)  # crop the BMP by this many pixels on each side
 MIN_PIECE_AREA = 400*400
 MAX_PIECE_DIMENSIONS = (1420, 1420)  # we use this to catch when two pieces are touching
-SEG_THRESH = 130  # raise this to cut tighter into the border
+SEG_THRESH = 145  # raise this to cut tighter into the border
 
 
 # Robot parameters
@@ -23,7 +23,8 @@ APPROX_ROBOT_COUNTS_PER_PIXEL = 10
 
 
 # Deduplication
-DUPLICATE_CENTROID_DELTA_PX = 50
+DUPLICATE_CENTROID_DELTA_PX = 22.0
+
 
 # Directory structure for data processing
 # Step 1 takes in photos of pieces on the bed and outputs binary BMPs of those photos

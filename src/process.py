@@ -82,8 +82,10 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
             input_path=pathlib.Path(path).joinpath(VECTOR_DIR),
             output_path=pathlib.Path(path).joinpath(DEDUPED_DIR)
         )
-        if count != PUZZLE_WIDTH * PUZZLE_HEIGHT:
-            raise Exception(f"dedupe: expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces but ended up with {count} unique pieces")
+        if count > PUZZLE_WIDTH * PUZZLE_HEIGHT:
+            raise Exception(f"dedupe: expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces but ended up with {count} unique pieces. Try adjusting DUPLICATE_CENTROID_DELTA_PX in config.py")
+        elif count < PUZZLE_WIDTH * PUZZLE_HEIGHT:
+            print(f"dedupe: expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces but ended up with {count} unique pieces. This is usually because some pieces are touching and were not separated. Try turning off CROP_TOP_RIGHT_BOTTOM_LEFT in config.py then running again to find the touching pieces.")
 
 
 def _bmp_all(input_path, output_path, id):
@@ -161,4 +163,4 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
             pool.map(vector.load_and_vectorize, args)
 
     duration = time.time() - start_time
-    print(f"Vectorizing took {round(duration, 2)} seconds ({round(duration /i, 2)} seconds per piece)")
+    print(f"Vectorizing took {round(duration, 2)} seconds")

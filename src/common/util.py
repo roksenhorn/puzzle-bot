@@ -698,63 +698,6 @@ def rotate_list(l, i):
     return l[i:] + l[:i]
 
 
-def find_islands(grid, ignore_islands_along_border=True, min_island_area=MIN_PIECE_AREA):
-    """
-    Given a grid of 0s and 1s, finds all "islands" of 1s:
-    00000000
-    01110000
-    01111000
-    00111110
-    00000000
-
-    :param grid: a 2D array of 0s and 1s
-    :param callback: a function that will be called with each island found
-    :param ignore_islands_along_border: if True, islands that touch the border of the grid will be ignored
-    :param 1: the value that represents an island in the grid (1 or 0)
-
-    Returns either a list of tuples: each island paired with its origin
-    """
-    # 8-connectivity - touching any other 1 on a side or corner
-    structure = np.array([[1, 1, 1],
-                          [1, 1, 1],
-                          [1, 1, 1]])
-
-    # to find connected components
-    labeled_array, num_features = label(grid, structure=structure)
-
-    # Optional: Extract slices for each island
-    slices = find_objects(labeled_array)
-    islands = []
-    origins = []
-    for i, s in enumerate(slices, start=1):
-        # Create a mask for the current island within the slice
-        mask = (labeled_array[s] == i)
-        # Apply the mask to the slice to extract only the current island
-        island = grid[s] * mask
-        islands.append(island)
-        origins.append((s[1].start, s[0].start))
-
-    # filter out any islands that touch the border (they're likely to be cropped pieces)
-    if ignore_islands_along_border:
-        h, w = grid.shape
-        for i in range(num_features):
-            if slices[i][0].start == 0 or slices[i][0].stop == h or slices[i][1].start == 0 or slices[i][1].stop == w:
-                islands[i] = None
-
-    # filter out tiny islands
-    for i, island in enumerate(islands):
-        if island is not None and island.sum() < min_island_area:
-            islands[i] = None
-
-    # zip the islands with their origins
-    output = []
-    for i, island in enumerate(islands):
-        if island is not None:
-            output.append((island, origins[i]))
-
-    return output
-
-
 def render_polygons(vertices_list: List[List[Tuple[int, int]]], bounds=None) -> None:
     vertices_list =[[(int(round(x)), int(round(y))) for x, y in vs] for vs in vertices_list]
 
