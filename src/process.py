@@ -25,8 +25,8 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
 
     if start_at_step <= 1 and stop_before_step > 1:
         width, height, scale_factor = _bmp_all(
-            input_path = pathlib.Path(path).joinpath(PHOTOS_DIR), 
-            output_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR), 
+            input_path = pathlib.Path(path).joinpath(PHOTOS_DIR),
+            output_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR),
             id = id
         )
     else:
@@ -49,7 +49,7 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
     photo_space_positions = {}
     if start_at_step <= 2 and stop_before_step > 2:
         photo_space_positions = _extract_all(
-            input_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR), 
+            input_path = pathlib.Path(path).joinpath(PHOTO_BMP_DIR),
             output_path = pathlib.Path(path).joinpath(SEGMENT_DIR),
             scale_factor = scale_factor
         )
@@ -60,22 +60,24 @@ def batch_process_photos(path, serialize, robot_states, id=None, start_at_step=0
 
     if start_at_step <= 3 and stop_before_step > 3:
         _vectorize_all(
-            input_path = pathlib.Path(path).joinpath(SEGMENT_DIR), 
-            metadata = metadata, 
-            robot_states = robot_states, 
-            output_path = pathlib.Path(path).joinpath(VECTOR_DIR), 
-            photo_space_positions = photo_space_positions, 
-            scale_factor = scale_factor, 
-            id = id, 
+            input_path = pathlib.Path(path).joinpath(SEGMENT_DIR),
+            metadata = metadata,
+            robot_states = robot_states,
+            output_path = pathlib.Path(path).joinpath(VECTOR_DIR),
+            photo_space_positions = photo_space_positions,
+            scale_factor = scale_factor,
+            id = id,
             serialize = serialize
         )
 
     if start_at_step <= 4 and stop_before_step > 4:
-        dedupe.deduplicate(
+        count = dedupe.deduplicate(
             batch_data_path = pathlib.Path(path).joinpath(PHOTOS_DIR).joinpath("batch.json"),
             input_path = pathlib.Path(path).joinpath(VECTOR_DIR),
             output_path = pathlib.Path(path).joinpath(DEDUPED_DIR)
         )
+        if count != PUZZLE_WIDTH * PUZZLE_HEIGHT:
+            raise Exception(f"dedupe: expected {PUZZLE_WIDTH * PUZZLE_HEIGHT} pieces but ended up with {count} unique pieces")
 
 
 def _bmp_all(input_path, output_path, id):
