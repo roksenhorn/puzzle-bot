@@ -9,7 +9,7 @@ from common.config import *
 def batch_extract(input_path, output_path, scale_factor):
     # just-in-time compile the C library to find islands
     source_file = pathlib.Path(os.path.join(os.path.dirname(__file__), '../c/find_islands.c'))
-    cmd = fr"gcc -pthread -O3 -march=native -funroll-loops -ffast-math -o find_islands.o {source_file}"
+    cmd = fr"gcc -pthread -O3 -march=native -funroll-loops -ffast-math -o find_islands.o '{source_file}'"
     print(cmd)
     try:
         subprocess.run(cmd, shell=True, check=True)
@@ -20,7 +20,7 @@ def batch_extract(input_path, output_path, scale_factor):
     # invoke the C library to find islands
     input_path = pathlib.Path(input_path)
     output_path = pathlib.Path(output_path)
-    cmd = fr".{os.path.sep}find_islands.o {input_path} {output_path} {MIN_PIECE_AREA}"
+    cmd = fr".{os.path.sep}find_islands.o '{input_path}' '{output_path}' {MIN_PIECE_AREA}"
     print(cmd)
     try:
         subprocess.run(cmd, shell=True, check=True)
