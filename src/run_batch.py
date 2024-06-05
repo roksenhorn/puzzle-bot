@@ -50,7 +50,7 @@ def main():
         robot_states[d["file_name"]] = d["position"]
 
     process.batch_process_photos(path=args.path, serialize=args.serialize, robot_states=robot_states, id=args.only_process_id, start_at_step=args.start_at_step, stop_before_step=args.stop_before_step)
-    if args.stop_before_step is not None and args.stop_before_step >= 3:
+    if args.stop_before_step is not None and args.stop_before_step >= 3 and args.only_process_id is None:
         solve.solve(path=args.path, start_at=args.start_at_step)
 
     duration = time.time() - start_time

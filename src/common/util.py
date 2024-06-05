@@ -247,6 +247,8 @@ def incenter(polygon):
     max_distance = 0
     incenter = None
     for point in points:
+        if not polygon.contains(point):
+            continue
         distance = polygon.exterior.distance(point)
         if distance > max_distance:
             max_distance = distance

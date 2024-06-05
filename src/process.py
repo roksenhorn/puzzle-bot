@@ -132,16 +132,18 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
     print(f"\n{util.BLUE}### 3 - Vectorizing ###{util.WHITE}\n")
 
     start_time = time.time()
-    i = id if id is not None else 1
+    i = 1
 
     args = []
 
     for f in os.listdir(input_path):
         if not f.endswith('.bmp'):
             continue
+        if id and f != id:
+            continue
 
         path = pathlib.Path(input_path).joinpath(f)
-        render = (i == id)
+        render = (id is not None)
         photo_space_position = photo_space_positions[f]
         original_photo_name = '_'.join(f.split('.')[0].split('_')[:-1]) + ".jpg"  # reverse engineer the BMP name to the JPG
         piece_metadata = metadata.copy()
@@ -150,10 +152,7 @@ def _vectorize_all(input_path, output_path, metadata, robot_states, photo_space_
         piece_metadata["robot_state"] = {"photo_at_motor_position": robot_states[original_photo_name]}
         args.append([path, i, output_path, piece_metadata, photo_space_position, scale_factor, render])
 
-        if id is not None:
-            break
-        else:
-            i += 1
+        i += 1
 
     if serialize:
         for arg in args:
