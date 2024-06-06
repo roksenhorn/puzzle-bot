@@ -14,8 +14,8 @@ def tighten_or_relax(solution_path, output_path):
         x, y = data["solution_x"], data["solution_y"]
         dest_x, dest_y = data["dest_photo_space_incenter"]
 
-        cumulative_padding_x = x * TIGHTEN_RELAX_PX
-        cumulative_padding_y = y * TIGHTEN_RELAX_PX
+        cumulative_padding_x = x * TIGHTEN_RELAX_PX_W
+        cumulative_padding_y = y * TIGHTEN_RELAX_PX_H
         dest_x += cumulative_padding_x
         dest_y += cumulative_padding_y
         data["dest_photo_space_incenter"] = [dest_x, dest_y]

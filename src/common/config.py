@@ -7,7 +7,8 @@ Common configuration for the puzzle bot
 PUZZLE_WIDTH = 40
 PUZZLE_HEIGHT = 25
 PUZZLE_NUM_PIECES = PUZZLE_WIDTH * PUZZLE_HEIGHT
-TIGHTEN_RELAX_PX = 3.5  # positive = add space between pieces, negative = remove space between pieces
+TIGHTEN_RELAX_PX_W = 5.699827119  # positive = add space between pieces, negative = remove space between pieces
+TIGHTEN_RELAX_PX_H = 9.121796862
 
 
 # Paramaters for photo segmentation
