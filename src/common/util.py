@@ -188,36 +188,12 @@ def average_angles(angles):
     >>> average_angles([90, 270]) => 180.0
     >>> average_angles([10, 20, 30]) => 20.0
     """
-    if not angles:
-        return None
-
-    sum_sin = 0
-    sum_cos = 0
-
-    for angle in angles:
-        angle = angle % 2 * math.pi
-        # Sum up the sine and cosine values
-        sum_sin += math.sin(angle)
-        sum_cos += math.cos(angle)
-
-    # Calculate average sine and cosine values
-    avg_sin = sum_sin / len(angles)
-    avg_cos = sum_cos / len(angles)
-
-    # Calculate the average angle from the average sine and cosine
-    if avg_cos == 0:
-        if avg_sin > 0:
-            average_angle = math.pi / 2  # 90 degrees
-        else:
-            average_angle = 3 * math.pi / 2  # 270 degrees
-    else:
-        average_angle = math.atan2(avg_sin, avg_cos)
-
-    # Convert the average angle from radians back to degrees
-    average_angle = math.degrees(average_angle)
-
-    # Ensure the average angle is non-negative
-    return average_angle if average_angle >= 0 else average_angle + 360
+    sin_sum = sum(math.sin(angle) for angle in angles)
+    cos_sum = sum(math.cos(angle) for angle in angles)
+    avg_angle = math.atan2(sin_sum, cos_sum)
+    if avg_angle < 0:
+        avg_angle += 2 * math.pi
+    return avg_angle
 
 
 def centroid(polygon):
