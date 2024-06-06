@@ -90,7 +90,22 @@ def move_pieces_into_place(puzzle, metadata_path, output_path):
         new_top, new_right, new_bottom, new_left = new_sides
 
         # compute how much each side wants to rotate to oppose their neighbors, and align to one of the neighbors
-        # TODO - we should align to any neighbors that exist, not just the one in this direction
+        # TODO - debug why this is making things worse, not better
+        # rotations = []
+        # if neighbor_above_angle is not None:
+        #     above_rotation = (neighbor_above_angle - side_angles[new_top] - math.pi)
+        #     rotations.append(above_rotation)
+        # if neighbor_right_angle is not None:
+        #     right_rotation = (neighbor_right_angle - side_angles[new_right] - math.pi)
+        #     rotations.append(right_rotation)
+        # if neighbor_below_angle is not None:
+        #     bottom_rotation = (neighbor_below_angle - side_angles[new_bottom] - math.pi)
+        #     rotations.append(bottom_rotation)
+        # if neighbor_left_angle is not None:
+        #     left_rotation = (neighbor_left_angle - side_angles[new_left] - math.pi)
+        #     rotations.append(left_rotation)
+        # rotation = util.average_angles(rotations)
+
         if direction == (1, 0):
             rotation = (neighbor_above_angle - side_angles[new_top] - math.pi)
         elif direction == (0, 1):

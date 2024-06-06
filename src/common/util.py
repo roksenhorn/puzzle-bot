@@ -180,10 +180,7 @@ def compare_angles(angle1, angle2):
 def average_angles(angles):
     """
     Calculate the average angle from a list of angles, taking into account the circular nature of angles.
-    We compute the average by converting each angle into its vector representation on the unit circle
-    (using sin and cos), then averaging these vectors to find the resultant vector. The angle of this resultant
-    vector is then converted back to degrees as the average angle. This method ensures that the average angle
-    properly accounts for the wrap-around at 0 degrees (360 degrees).
+    Input and output are in radians.
     >>> average_angles([358, 2]) => 0.0
     >>> average_angles([90, 270]) => 180.0
     >>> average_angles([10, 20, 30]) => 20.0
