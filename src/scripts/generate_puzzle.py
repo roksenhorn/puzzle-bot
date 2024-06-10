@@ -111,42 +111,6 @@ def generate(cols, rows, width, height, waviness, output_dir):
     print(f"Generated puzzle.svg in {output_dir}")
 
 
-def _generate_horizontal_nubbed_side(ax, ay, bx, by, waviness, max_height, nub_direction):
-    """
-    Generate a side with a nub that connects the two points
-    """
-    w = bx - ax
-    slope = (by - ay) / w
-
-    nub_base_width = 0.15 + random.uniform(0.0, 0.4)
-    nub_base_center_x = (0.5 + random.uniform(-0.4, 0.4) * waviness)
-    nub_start_x = ax + nub_base_center_x * (bx - ax) - nub_base_width/2 * (bx - ax)
-    nub_end_x = ax + nub_base_center_x * (bx - ax) + nub_base_width/2 * (bx - ax)
-    nub_slope = slope * random.uniform(0.5, 1.5) * waviness
-    nub_start_y = ay + nub_slope * (nub_start_x - ax)
-    nub_end_y = ay + nub_slope * (nub_end_x - ax)
-
-    maxy = max(nub_start_y, nub_end_y)
-    miny = min(nub_start_y, nub_end_y)
-    nub_ratio_factor = 1.0 - nub_base_width  # if the nub is wide, it should be short, if the nub is narrow, it should be tall
-    nub_peak_y = (maxy if nub_direction == 1 else miny) + nub_direction * min(max_height * 0.45, (0.4 * max_height * nub_ratio_factor * random.uniform(0.75, 1.25)))
-    nub_peak_x = ax + nub_base_center_x * (bx - ax)
-    nub_peak_width = nub_base_width * random.uniform(1.02, 1.75)
-    nub_peak_before_x = nub_peak_x - nub_peak_width/2 * (bx - ax)
-    nub_peak_before_y = nub_peak_y + (-0.1 if nub_direction == 1 else 0.1) * 30
-    nub_peak_after_x = nub_peak_x + nub_peak_width/2 * (bx - ax)
-    nub_peak_after_y = nub_peak_y + (-0.1 if nub_direction == 1 else 0.1) * 30
-    return [
-        (ax, ay),
-        (nub_start_x, nub_start_y),
-        (nub_peak_before_x, nub_peak_before_y),
-        (nub_peak_x, nub_peak_y),
-        (nub_peak_after_x, nub_peak_after_y),
-        (nub_end_x, nub_end_y),
-        (bx, by),
-    ]
-
-
 def _generate_grid(cols, rows, width, height, waviness):
     """
     Lays out a grid for where each pieces' corners will be at
@@ -164,12 +128,12 @@ def _generate_grid(cols, rows, width, height, waviness):
         scale = sum_to / sum(nums)
         return [num * scale for num in nums]
 
-    min_row_height = (1.0 - W * waviness**0.8) * float(height) / float(rows)
-    max_row_height = (1.0 + W * waviness**0.8) * float(height) / float(rows)
+    min_row_height = (1.0 - W * waviness**1.1) * float(height) / float(rows)
+    max_row_height = (1.0 + W * waviness**1.1) * float(height) / float(rows)
     row_heights = random_floats(n=rows, min=min_row_height, max=max_row_height, sum_to=height)
 
-    min_col_width = (1.0 - W * waviness**0.8) * float(width) / float(cols)
-    max_col_width = (1.0 + W * waviness**0.8) * float(width) / float(cols)
+    min_col_width = (1.0 - W * waviness**1.1) * float(width) / float(cols)
+    max_col_width = (1.0 + W * waviness**1.1) * float(width) / float(cols)
     col_widths = random_floats(n=cols, min=min_col_width, max=max_col_width, sum_to=width)
     print(row_heights)
     print(col_widths)
@@ -182,8 +146,8 @@ def _generate_grid(cols, rows, width, height, waviness):
                 x_wave = 0
                 y_wave = 0
             else:
-                x_wave = random.uniform(-1.0, 1.0) * W * waviness**1.2 * (width / cols)
-                y_wave = random.uniform(-1.0, 1.0) * W * waviness**1.2 * (height / rows)
+                x_wave = random.uniform(-1.0, 1.0) * W * waviness**0.9 * (width / cols)
+                y_wave = random.uniform(-1.0, 1.0) * W * waviness**0.9 * (height / rows)
             x = sum(col_widths[0:i]) + x_wave
             y = sum(row_heights[0:j]) + y_wave
             gridpoints[(i, j)] = (x, y)
