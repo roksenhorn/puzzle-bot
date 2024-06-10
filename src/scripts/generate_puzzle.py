@@ -1,6 +1,94 @@
 import os
 import argparse
 import random
+import math
+
+
+class Nub:
+    def __init__(self, side_start, side_end, nub_direction, max_height):
+        # construct a unit nub and annotate how each point can be manipulated
+        points = [
+            (0.000, 1.000), # anchor
+            (0.238, 1.000), # control point1
+            (0.357, 0.900), # control point2
+            (0.357, 0.760), # anchor
+            (0.357, 0.590), # control point1
+            (0.048, 0.590), # control point2
+            (0.048, 0.305), # anchor
+            (0.048, 0.076), # ...
+            (0.190, 0.000),
+            (0.5, 0.000),
+            (0.890, 0.000),
+            (1.000, 0.124),
+            (1.000, 0.286),
+            (1.000, 0.476),
+            (0.695, 0.508),
+            (0.695, 0.760),
+            (0.695, 0.943),
+            (0.881, 1.000),
+            (1.000, 1.000),
+        ]
+        points = [(x, y - 1) for (x, y) in points]
+
+        # randomize the width of the neck
+        # negative shifts the left side of the neck to the left and right side to the right, making it wider
+        # positive shifts the left side of the neck to the right and right side to the left, making it narrower
+        neck_width_shift = random.uniform(-0.25, 0.03)
+        for i in range(0, 5):
+            points[i] = (points[i][0] + neck_width_shift, points[i][1])
+            points[-i - 1] = (points[-i - 1][0] - neck_width_shift, points[-i - 1][1])
+
+        mid_width_shift = random.uniform(-0.25, 0.2) + 0.5 * neck_width_shift
+        for i in range(5, 9):
+            points[i] = (points[i][0] + mid_width_shift, points[i][1])
+            points[-i - 1] = (points[-i - 1][0] - mid_width_shift, points[-i - 1][1])
+
+        # add a random skew to the left or right for some nubs
+        skew = random.uniform(-0.4, 0.4) if random.random() < 0.25 else 0.0
+        for i, (x, y) in enumerate(points):
+            points[i] = (x + skew * y, y)
+
+        # randomize the height of the nub
+        height_mult = random.uniform(0.9, 1.4 if neck_width_shift < 0.0 else 1.6)
+        points = [(x, y * height_mult) for (x, y) in points]
+
+        # sometimes have the nub go out, sometime have the nub go in
+        if nub_direction == -1:
+            points = [(x, -y) for (x, y) in points]
+
+        scale = 0.25 * max_height
+        scaled = [(scale * x, scale * y) for (x, y) in points]
+
+        # rotate around the origin by a random amount centerd around the slope of the side
+        theta = math.atan((side_end[1] - side_start[1]) / (side_end[0] - side_start[0])) #+ random.uniform(-0.2, 0.2)
+        if theta < - math.pi / 4:
+            theta += math.pi
+        rotated = [(x * math.cos(theta) - y * math.sin(theta), x * math.sin(theta) + y * math.cos(theta)) for (x, y) in scaled]
+
+        # 0.0 is all the way to the left, 1.0 is all the way to the right
+        left_right_ratio = random.uniform(0.15, 0.85)
+        is_vertical = theta > math.pi / 4 and theta < 3 * math.pi / 4
+        nub_width = max([x for (x, _) in rotated]) - min([x for (x, _) in rotated]) if not is_vertical else 0
+        nub_height = max([y for (_, y) in rotated]) - min([y for (_, y) in rotated]) if is_vertical else 0
+        translate_x = side_start[0] + left_right_ratio * (side_end[0] - side_start[0] - nub_width)
+        translate_y = side_start[1] + left_right_ratio * (side_end[1] - side_start[1] - nub_height)
+        translated = [(x + translate_x, y + translate_y) for (x, y) in rotated]
+        self.bezier = [side_start, side_start, translated[0]] + translated + [translated[-1], side_end, side_end]
+
+    @property
+    def endpoints(self):
+        return [
+            (self.x, self.y),
+            (self.x, self.y),
+        ]
+
+    @property
+    def svg(self):
+        path_data = f"M {self.bezier[0][0]} {self.bezier[0][1]}"  # Move to the first anchor point
+        for i in range(1, len(self.bezier) - 2, 3):
+            p1, p2, p3 = self.bezier[i], self.bezier[i+1], self.bezier[i+2]
+            path_data += f" C {p1[0]} {p1[1]}, {p2[0]} {p2[1]}, {p3[0]} {p3[1]}"  # Cubic Bézier to the next anchor
+        return f""" <path d="{path_data}" stroke="black" fill="none"/>"""
 
 
 def generate(cols, rows, width, height, waviness, output_dir):
@@ -13,10 +101,8 @@ def generate(cols, rows, width, height, waviness, output_dir):
         hue = 360 * i / len(gridpoints)
         svg += f'<circle cx="{point[0]}" cy="{point[1]}" r="2" fill="hsl({hue}, 100%, 50%)" />'
 
-    for i, nub in enumerate(sides):
-        hue = 360 * i / len(sides)
-        linestr = " ".join([f"{x},{y}" for x, y in nub])
-        svg += f'<polyline points="{linestr}" fill="none" stroke="hsl({hue}, 100%, 50%)" stroke-width="1" />'
+    for side in sides:
+        svg += side
 
     svg += "</svg>"
     with open(os.path.join(output_dir, "puzzle.svg"), "w") as f:
@@ -25,10 +111,7 @@ def generate(cols, rows, width, height, waviness, output_dir):
     print(f"Generated puzzle.svg in {output_dir}")
 
 
-# 0.5 => 0.2
-# 0.2 => 0.5
-
-def _generate_horizontal_nubbed_side(ax, ay, bx, by, waviness, max_y):
+def _generate_horizontal_nubbed_side(ax, ay, bx, by, waviness, max_height, nub_direction):
     """
     Generate a side with a nub that connects the two points
     """
@@ -43,24 +126,23 @@ def _generate_horizontal_nubbed_side(ax, ay, bx, by, waviness, max_y):
     nub_start_y = ay + nub_slope * (nub_start_x - ax)
     nub_end_y = ay + nub_slope * (nub_end_x - ax)
 
-    nub_direction = random.choice([-1, 1])
     maxy = max(nub_start_y, nub_end_y)
     miny = min(nub_start_y, nub_end_y)
     nub_ratio_factor = 1.0 - nub_base_width  # if the nub is wide, it should be short, if the nub is narrow, it should be tall
-    nub_peak_y = (maxy if nub_direction == 1 else miny) + nub_direction * (0.3 * max_y * nub_ratio_factor * random.uniform(0.6, 1.4))
+    nub_peak_y = (maxy if nub_direction == 1 else miny) + nub_direction * min(max_height * 0.45, (0.4 * max_height * nub_ratio_factor * random.uniform(0.75, 1.25)))
     nub_peak_x = ax + nub_base_center_x * (bx - ax)
+    nub_peak_width = nub_base_width * random.uniform(1.02, 1.75)
+    nub_peak_before_x = nub_peak_x - nub_peak_width/2 * (bx - ax)
+    nub_peak_before_y = nub_peak_y + (-0.1 if nub_direction == 1 else 0.1) * 30
+    nub_peak_after_x = nub_peak_x + nub_peak_width/2 * (bx - ax)
+    nub_peak_after_y = nub_peak_y + (-0.1 if nub_direction == 1 else 0.1) * 30
     return [
         (ax, ay),
         (nub_start_x, nub_start_y),
+        (nub_peak_before_x, nub_peak_before_y),
         (nub_peak_x, nub_peak_y),
+        (nub_peak_after_x, nub_peak_after_y),
         (nub_end_x, nub_end_y),
-        (bx, by),
-    ]
-
-
-def _generate_vertical_nubbed_side(ax, ay, bx, by, waviness):
-    return [
-        (ax, ay),
         (bx, by),
     ]
 
@@ -82,12 +164,12 @@ def _generate_grid(cols, rows, width, height, waviness):
         scale = sum_to / sum(nums)
         return [num * scale for num in nums]
 
-    min_row_height = (1.0 - W * waviness) * float(height) / float(rows)
-    max_row_height = (1.0 + W * waviness) * float(height) / float(rows)
+    min_row_height = (1.0 - W * waviness**0.8) * float(height) / float(rows)
+    max_row_height = (1.0 + W * waviness**0.8) * float(height) / float(rows)
     row_heights = random_floats(n=rows, min=min_row_height, max=max_row_height, sum_to=height)
 
-    min_col_width = (1.0 - W * waviness) * float(width) / float(cols)
-    max_col_width = (1.0 + W * waviness) * float(width) / float(cols)
+    min_col_width = (1.0 - W * waviness**0.8) * float(width) / float(cols)
+    max_col_width = (1.0 + W * waviness**0.8) * float(width) / float(cols)
     col_widths = random_floats(n=cols, min=min_col_width, max=max_col_width, sum_to=width)
     print(row_heights)
     print(col_widths)
@@ -100,8 +182,8 @@ def _generate_grid(cols, rows, width, height, waviness):
                 x_wave = 0
                 y_wave = 0
             else:
-                x_wave = random.uniform(-1, 1) * W * waviness * (width / cols)
-                y_wave = random.uniform(-1, 1) * W * waviness * (height / rows)
+                x_wave = random.uniform(-1.0, 1.0) * W * waviness**1.2 * (width / cols)
+                y_wave = random.uniform(-1.0, 1.0) * W * waviness**1.2 * (height / rows)
             x = sum(col_widths[0:i]) + x_wave
             y = sum(row_heights[0:j]) + y_wave
             gridpoints[(i, j)] = (x, y)
@@ -110,20 +192,24 @@ def _generate_grid(cols, rows, width, height, waviness):
             if i > 0:
                 prev_x, prev_y = gridpoints[(i - 1, j)]
                 if j == 0 or j == rows - 1:
-                    border_side = [(prev_x, prev_y), (x, y)]
-                    sides.append(border_side)
+                    border_side_svg = f""" <line x1="{prev_x}" y1="{prev_y}" x2="{x}" y2="{y}" stroke="black"/>"""
+                    sides.append(border_side_svg)
                 else:
-                    nubbded_side = _generate_horizontal_nubbed_side(prev_x, prev_y, x, y, waviness, max_y=row_heights[j])
+                    nub_direction = random.choice([-1, 1])
+                    max_height = row_heights[j] if nub_direction == -1 else row_heights[j + 1]
+                    nubbded_side = Nub((prev_x, prev_y), (x, y), nub_direction, max_height).svg
                     sides.append(nubbded_side)
 
             # generate vertical sides
             if j > 0:
                 prev_x, prev_y = gridpoints[(i, j - 1)]
                 if i == 0 or i == cols - 1:
-                    border_side = [(prev_x, prev_y), (x, y)]
-                    sides.append(border_side)
+                    border_side_svg = f""" <line x1="{prev_x}" y1="{prev_y}" x2="{x}" y2="{y}" stroke="black"/>"""
+                    sides.append(border_side_svg)
                 else:
-                    nubbded_side = _generate_vertical_nubbed_side(prev_x, prev_y, x, y, waviness)
+                    nub_direction = random.choice([-1, 1])
+                    max_height = col_widths[i] if nub_direction == -1 else col_widths[i + 1]
+                    nubbded_side = Nub((prev_x, prev_y), (x, y), nub_direction, max_height).svg
                     sides.append(nubbded_side)
 
     return gridpoints, sides

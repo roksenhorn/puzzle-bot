@@ -1,3 +1,4 @@
+*.svg
 *.pxd
 *.prof
 .DS_Store
