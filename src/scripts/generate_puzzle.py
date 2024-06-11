@@ -23,14 +23,22 @@ class Side:
     @staticmethod
     def sinusoid(side_start, side_end, max_height):
         side = Side(side_start, side_end)
-        num_half_periods = random.randint(1, 5)
-        bezier = [(0, 0), (0, 0)]
+
+        nubby_sinusoid = random.random() < 0.5
+        if nubby_sinusoid:
+            num_half_periods = random.randint(2, 5)
+        else:
+            num_half_periods = random.randint(1, 5)
         amplitude = random.uniform(0.1, 0.2) / (num_half_periods**0.5)
         phase = random.choice([-1, 1])
         angle = math.atan2(side_end[1] - side_start[1], side_end[0] - side_start[0])
 
+        bezier = [(0, 0), (0, 0)]
         for i in range(num_half_periods):
-            hump_width = random.uniform(0.2, 0.4) / num_half_periods
+            if nubby_sinusoid:
+                hump_width = random.uniform(0.75, 1.5) / num_half_periods
+            else:
+                hump_width = random.uniform(0.2, 0.4) / num_half_periods
             pointx = (i + 1) / (num_half_periods + 1)
             pointy = amplitude * (1 if i % 2 == 0 else -1) * phase
             bezier.append((pointx - hump_width, pointy))
