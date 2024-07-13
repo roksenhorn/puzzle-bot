@@ -2,6 +2,14 @@
 
 The code that powers a jigsaw puzzle solving robot. This reliably solves a few 1000-piece all-white puzzles. I'm making this somewhat easier on myself by assuming the puzzle pieces come to form a grid, where each piece has four sides.
 
+## Watch the Results
+
+I made a Youtube video with Mark Rober [here](https://www.youtube.com/watch?v=Sqr-PdVYhY4).
+
+## Full Technical Writeup
+
+[Fourty-four pages of detail can be found here](https://docs.google.com/document/d/1BUCGdZCe8JevGYF3pJ4ZjPqpcSgA7LF0kV6sWbHrT1Q/).
+
 ## Puzzle Solving Overview
 
 1. *Manually lay pieces out in the staging area*
