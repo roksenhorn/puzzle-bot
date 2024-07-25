@@ -385,7 +385,7 @@ void* worker(void* arg) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
+    if (argc == 4) {
         fprintf(stderr, "Usage: %s <input_directory> <output_directory> <min_island_area>\n", argv[0]);
         return 1;
     }
